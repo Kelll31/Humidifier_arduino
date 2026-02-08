@@ -77,14 +77,14 @@
 #define EEPROM_MIN_HUM_ADDR     1     // Адрес минимальной влажности
 #define EEPROM_MAX_HUM_ADDR     2     // Адрес максимальной влажности
 #define EEPROM_HYSTERESIS_ADDR  3     // Адрес гистерезиса
-#define EEPROM_TEMP_CAL_ADDR    4     // Адрес калибровки температуры (2 байта)
-#define EEPROM_HUM_CAL_ADDR     6     // Адрес калибровки влажности (2 байта)
-#define EEPROM_WORK_TIME_ADDR   8     // Адрес времени работы (4 байта)
+#define EEPROM_TEMP_CAL_ADDR    4     // Адрес калибровки температуры (4 байта float)
+#define EEPROM_HUM_CAL_ADDR     8     // Адрес калибровки влажности (4 байта float)
+#define EEPROM_WORK_TIME_ADDR   12    // Адрес времени работы (4 байта unsigned long)
 
 // ============================================================================
 // СИСТЕМНЫЕ КОНСТАНТЫ
 // ============================================================================
 
-#define FIRMWARE_VERSION        "1.1"
+#define FIRMWARE_VERSION        "1.2"
 
 #endif // CONFIG_H
