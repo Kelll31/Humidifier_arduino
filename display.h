@@ -42,7 +42,7 @@ public:
   }
 
   // Главный экран
-  void drawMainScreen(float temp, float hum, uint8_t targetHum, bool running, unsigned long workTime) {
+  void drawMainScreen(float temp, float hum, uint8_t targetHum, bool running, unsigned long workTime, bool sensorOK) {
     oled.clear();
 
     // Заголовок
@@ -53,13 +53,28 @@ public:
     // Разделительная линия
     oled.line(0, 12, 127, 12);
 
+    // Проверка ошибки датчика
+    if (!sensorOK) {
+      oled.setScale(2);
+      oled.setCursor(15, 3);
+      oled.print(F("ОШИБКА"));
+      oled.setScale(1);
+      oled.setCursor(20, 6);
+      oled.print(F("Датчик DHT22"));
+      oled.update();
+      return;
+    }
+
     // Температура
     oled.setCursor(0, 2);
-    oled.print(F("Темп: "));
+    oled.print(F("Темп:"));
     oled.setScale(2);
     oled.setCursor(40, 2);
-    if (temp >= 0) oled.print(temp, 1);
-    else oled.print(F("--"));
+    if (temp >= -40 && temp <= 80) {
+      oled.print(temp, 1);
+    } else {
+      oled.print(F("--"));
+    }
     oled.setScale(1);
     oled.print(F("C"));
 
@@ -68,8 +83,11 @@ public:
     oled.print(F("Влажн:"));
     oled.setScale(2);
     oled.setCursor(40, 4);
-    if (hum >= 0) oled.print(hum, 1);
-    else oled.print(F("--"));
+    if (hum >= 0 && hum <= 100) {
+      oled.print(hum, 1);
+    } else {
+      oled.print(F("--"));
+    }
     oled.setScale(1);
     oled.print(F("%"));
 
@@ -82,7 +100,14 @@ public:
     oled.print(targetHum);
     oled.print(F("%"));
 
-    oled.setCursor(65, 7);
+    // Время работы (часы)
+    if (workTime >= 3600) {
+      oled.setCursor(50, 7);
+      oled.print(workTime / 3600);
+      oled.print(F("ч"));
+    }
+
+    oled.setCursor(85, 7);
     if (running) {
       oled.print(F("ВКЛ"));
       // Анимация работы
@@ -109,6 +134,87 @@ public:
     if (fillWidth > 0) {
       oled.rect(x + 1, y + 1, x + 1 + fillWidth, y + height - 1, OLED_FILL);
     }
+  }
+
+  // Экран "О системе"
+  void drawAboutScreen(unsigned long workTime, uint8_t switchCount) {
+    oled.clear();
+    
+    oled.setScale(1);
+    oled.setCursor(20, 0);
+    oled.print(F("О СИСТЕМЕ"));
+    oled.line(0, 10, 127, 10);
+
+    oled.setCursor(0, 2);
+    oled.print(F("Версия: "));
+    oled.print(FIRMWARE_VERSION);
+
+    oled.setCursor(0, 3);
+    oled.print(F("Автор: Pentester"));
+
+    oled.setCursor(0, 4);
+    oled.print(F("Сборка: "));
+    oled.print(F(__DATE__));
+
+    // Время работы
+    oled.setCursor(0, 5);
+    oled.print(F("Работа: "));
+    if (workTime >= 3600) {
+      oled.print(workTime / 3600);
+      oled.print(F("ч "));
+    }
+    oled.print((workTime % 3600) / 60);
+    oled.print(F("м"));
+
+    // Количество переключений
+    oled.setCursor(0, 6);
+    oled.print(F("Перекл: "));
+    oled.print(switchCount);
+    oled.print(F("/час"));
+
+    oled.setCursor(0, 7);
+    oled.print(F("ДЛ-выход"));
+
+    oled.update();
+  }
+
+  // Экран калибровки
+  void drawCalibrationScreen(float currentTemp, float currentHum, float tempCal, float humCal, bool editingTemp) {
+    oled.clear();
+    
+    oled.setScale(1);
+    oled.setCursor(15, 0);
+    oled.print(F("КАЛИБРОВКА"));
+    oled.line(0, 10, 127, 10);
+
+    // Текущие значения
+    oled.setCursor(0, 2);
+    oled.print(F("Т: "));
+    oled.print(currentTemp, 1);
+    oled.print(F("C  В: "));
+    oled.print(currentHum, 1);
+    oled.print(F("%"));
+
+    // Коррекция температуры
+    oled.setCursor(0, 4);
+    if (editingTemp) oled.print(F("> "));
+    oled.print(F("Корр.Т: "));
+    if (tempCal >= 0) oled.print(F("+"));
+    oled.print(tempCal, 1);
+    oled.print(F("C"));
+
+    // Коррекция влажности
+    oled.setCursor(0, 5);
+    if (!editingTemp) oled.print(F("> "));
+    oled.print(F("Корр.В: "));
+    if (humCal >= 0) oled.print(F("+"));
+    oled.print(humCal, 1);
+    oled.print(F("%"));
+
+    oled.setCursor(0, 7);
+    oled.print(F("ДН-след ДЛ-OK"));
+
+    oled.update();
   }
 
   // Очистка экрана
