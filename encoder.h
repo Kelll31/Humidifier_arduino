@@ -61,9 +61,6 @@ public:
       }
 
       lastRotateTime = millis();
-
-      DEBUG_PRINT(F("[Encoder] Позиция: "));
-      DEBUG_PRINTLN(position);
     }
 
     lastClkState = clkState;
@@ -79,15 +76,6 @@ public:
         // Кнопка нажата
         buttonPressTime = millis();
         longPressDetected = false;
-        DEBUG_PRINTLN(F("[Encoder] Кнопка нажата"));
-      }
-      else if (currentButtonState == HIGH && lastButtonState == LOW) {
-        // Кнопка отпущена
-        unsigned long pressDuration = millis() - buttonPressTime;
-
-        if (pressDuration < LONG_PRESS_TIME && !longPressDetected) {
-          DEBUG_PRINTLN(F("[Encoder] Короткое нажатие"));
-        }
       }
     }
 
@@ -95,7 +83,6 @@ public:
     if (currentButtonState == LOW && !longPressDetected) {
       if (millis() - buttonPressTime >= LONG_PRESS_TIME) {
         longPressDetected = true;
-        DEBUG_PRINTLN(F("[Encoder] Длинное нажатие"));
       }
     }
 
