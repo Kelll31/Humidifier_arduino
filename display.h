@@ -150,7 +150,7 @@ public:
     oled.print(FIRMWARE_VERSION);
 
     oled.setCursor(0, 3);
-    oled.print(F("Автор: Pentester"));
+    oled.print(F("Автор: kelll31"));
 
     oled.setCursor(0, 4);
     oled.print(F("Сборка: "));

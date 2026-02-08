@@ -160,7 +160,7 @@ fatal error: Adafruit_Sensor.h: No such file or directory
 
 ## Автор
 
-Pentester
+kelll31
 
 ## Лицензия
 
