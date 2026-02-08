@@ -34,13 +34,11 @@ public:
 
     if (magic != EEPROM_MAGIC_VALUE) {
       // Первый запуск - инициализация EEPROM
-      DEBUG_PRINTLN(F("[Storage] Первый запуск. Инициализация..."));
       setDefaults();
       save();
     } else {
       // Загрузка настроек
       load();
-      DEBUG_PRINTLN(F("[Storage] Настройки загружены из EEPROM"));
     }
   }
 
@@ -77,8 +75,6 @@ public:
     EEPROM.put(EEPROM_TEMP_CAL_ADDR, tempCalibration);
     EEPROM.put(EEPROM_HUM_CAL_ADDR, humCalibration);
     EEPROM.put(EEPROM_WORK_TIME_ADDR, workTime);
-
-    DEBUG_PRINTLN(F("[Storage] Настройки сохранены в EEPROM"));
   }
 
   // Установка значений по умолчанию
@@ -89,15 +85,12 @@ public:
     tempCalibration = TEMP_CALIBRATION;
     humCalibration = HUM_CALIBRATION;
     workTime = 0;
-
-    DEBUG_PRINTLN(F("[Storage] Установлены значения по умолчанию"));
   }
 
   // Сброс всех настроек
   void reset() {
     setDefaults();
     save();
-    DEBUG_PRINTLN(F("[Storage] Все настройки сброшены"));
   }
 
   // Геттеры
@@ -111,32 +104,22 @@ public:
   // Сеттеры
   void setMinHumidity(uint8_t value) {
     minHumidity = constrain(value, 20, 80);
-    DEBUG_PRINT(F("[Storage] Мин. влажность: "));
-    DEBUG_PRINTLN(minHumidity);
   }
 
   void setMaxHumidity(uint8_t value) {
     maxHumidity = constrain(value, 30, 90);
-    DEBUG_PRINT(F("[Storage] Макс. влажность: "));
-    DEBUG_PRINTLN(maxHumidity);
   }
 
   void setHysteresis(uint8_t value) {
     hysteresis = constrain(value, 1, 20);
-    DEBUG_PRINT(F("[Storage] Гистерезис: "));
-    DEBUG_PRINTLN(hysteresis);
   }
 
   void setTempCalibration(float value) {
     tempCalibration = constrain(value, -10.0, 10.0);
-    DEBUG_PRINT(F("[Storage] Калибровка температуры: "));
-    DEBUG_PRINTLN(tempCalibration);
   }
 
   void setHumCalibration(float value) {
     humCalibration = constrain(value, -20.0, 20.0);
-    DEBUG_PRINT(F("[Storage] Калибровка влажности: "));
-    DEBUG_PRINTLN(humCalibration);
   }
 
   // Увеличение времени работы
@@ -147,7 +130,6 @@ public:
   // Сброс времени работы
   void resetWorkTime() {
     workTime = 0;
-    DEBUG_PRINTLN(F("[Storage] Время работы сброшено"));
   }
 
   // Форматирование времени работы
