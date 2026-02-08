@@ -15,17 +15,32 @@ private:
   DHT dht;
   float temperature;
   float humidity;
+  float rawTemperature;
+  float rawHumidity;
   bool lastReadSuccess;
   unsigned long lastReadTime;
   uint8_t errorCount;
+  uint8_t consecutiveErrors;
+  
+  // Указатель на storage для калибровки
+  class Storage* storage;
 
 public:
   Sensor() : dht(DHT_PIN, DHT_TYPE), 
              temperature(0), 
-             humidity(0), 
+             humidity(0),
+             rawTemperature(0),
+             rawHumidity(0),
              lastReadSuccess(false),
              lastReadTime(0),
-             errorCount(0) {}
+             errorCount(0),
+             consecutiveErrors(0),
+             storage(nullptr) {}
+
+  // Установка ссылки на storage
+  void setStorage(class Storage* stor) {
+    storage = stor;
+  }
 
   // Инициализация датчика
   void begin() {
@@ -48,22 +63,47 @@ public:
 
     // Проверка корректности данных
     if (isnan(h) || isnan(t)) {
-      errorCount++;
-      lastReadSuccess = false;
+      handleError();
       return false;
     }
 
-    // Применение калибровки
-    temperature = t + TEMP_CALIBRATION;
-    humidity = h + HUM_CALIBRATION;
+    // Проверка диапазона значений
+    if (t < -40.0 || t > 80.0 || h < 0.0 || h > 100.0) {
+      handleError();
+      return false;
+    }
 
-    // Ограничение влажности в диапазоне 0-100%
+    // Сохранение сырых значений
+    rawTemperature = t;
+    rawHumidity = h;
+
+    // Применение калибровки из storage
+    if (storage != nullptr) {
+      temperature = t + storage->getTempCalibration();
+      humidity = h + storage->getHumCalibration();
+    } else {
+      temperature = t;
+      humidity = h;
+    }
+
+    // Ограничение в допустимых пределах
+    temperature = constrain(temperature, -40.0, 80.0);
     humidity = constrain(humidity, 0.0, 100.0);
 
-    errorCount = 0;
+    // Успешное чтение
+    consecutiveErrors = 0;
     lastReadSuccess = true;
 
     return true;
+  }
+
+  // Обработка ошибки
+  void handleError() {
+    consecutiveErrors++;
+    if (errorCount < 255) {
+      errorCount++;
+    }
+    lastReadSuccess = false;
   }
 
   // Получение температуры
@@ -76,14 +116,40 @@ public:
     return humidity;
   }
 
+  // Получение сырой температуры (без калибровки)
+  float getRawTemperature() const {
+    return rawTemperature;
+  }
+
+  // Получение сырой влажности (без калибровки)
+  float getRawHumidity() const {
+    return rawHumidity;
+  }
+
   // Проверка состояния датчика
   bool isOK() const {
-    return lastReadSuccess && (errorCount < 5);
+    return lastReadSuccess && (consecutiveErrors < 3);
+  }
+
+  // Критическая ошибка
+  bool isCriticalError() const {
+    return consecutiveErrors >= 5;
   }
 
   // Получение количества ошибок
   uint8_t getErrorCount() const {
     return errorCount;
+  }
+
+  // Получение последовательных ошибок
+  uint8_t getConsecutiveErrors() const {
+    return consecutiveErrors;
+  }
+
+  // Сброс счетчика ошибок
+  void resetErrorCount() {
+    errorCount = 0;
+    consecutiveErrors = 0;
   }
 };
 
