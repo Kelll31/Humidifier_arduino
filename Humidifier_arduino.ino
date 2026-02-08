@@ -12,7 +12,7 @@
  * 
  * Автор: Pentester
  * Дата: 2026-02-08
- * Версия: 1.1 - Оптимизация памяти
+ * Версия: 1.2 - Добавлена полная обработка меню
  */
 
 #include "config.h"
@@ -54,7 +54,7 @@ void setup() {
   humidifier.begin();
 
   // Инициализация меню
-  menu.begin(&display, &encoder, &storage);
+  menu.begin(&display, &encoder, &storage, &sensor, &humidifier);
 
   // Включение watchdog timer (защита от зависания)
   wdt_enable(WDTO_4S);
@@ -101,8 +101,15 @@ void loop() {
       sensor.getHumidity(),
       storage.getMaxHumidity(),
       humidifier.isRunning(),
-      storage.getWorkTime()
+      storage.getWorkTime(),
+      sensor.isOK()
     );
+    
+    // Длинное нажатие на главном экране - вход в меню
+    if (encoder.isLongPress()) {
+      encoder.clearLongPress();
+      menu.open();
+    }
   }
 
   // Автосохранение настроек каждые 5 минут
