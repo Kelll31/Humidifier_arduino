@@ -12,7 +12,7 @@
  * 
  * Автор: Pentester
  * Дата: 2026-02-08
- * Версия: 1.2 - Добавлена полная обработка меню
+ * Версия: 1.3 - Production Ready
  */
 
 #include "config.h"
@@ -46,12 +46,14 @@ void setup() {
 
   // Инициализация датчика
   sensor.begin();
+  sensor.setStorage(&storage); // Связь с storage для калибровки
 
   // Инициализация энкодера
   encoder.begin();
 
   // Инициализация увлажнителя
   humidifier.begin();
+  humidifier.setStorage(&storage); // Связь с storage для учета переключений
 
   // Инициализация меню
   menu.begin(&display, &encoder, &storage, &sensor, &humidifier);
@@ -67,6 +69,9 @@ void loop() {
   // Обработка энкодера
   encoder.tick();
 
+  // Обработка storage (защита EEPROM)
+  storage.tick();
+
   // Обновление данных с датчика каждые 2 секунды
   if (millis() - lastUpdateTime >= UPDATE_INTERVAL) {
     lastUpdateTime = millis();
@@ -76,7 +81,7 @@ void loop() {
       float hum = sensor.getHumidity();
 
       // Управление увлажнителем
-      humidifier.control(hum, storage.getMinHumidity(), storage.getMaxHumidity());
+      humidifier.control(hum, storage.getMinHumidity(), storage.getMaxHumidity(), sensor.isOK());
 
       // Обновление времени работы
       if (humidifier.isRunning()) {
@@ -115,7 +120,7 @@ void loop() {
   // Автосохранение настроек каждые 5 минут
   if (millis() - lastSaveTime >= AUTOSAVE_INTERVAL) {
     lastSaveTime = millis();
-    storage.save();
+    storage.saveDirect();
   }
 
   // Небольшая задержка для стабильности
