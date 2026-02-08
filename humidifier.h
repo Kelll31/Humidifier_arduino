@@ -17,6 +17,9 @@ private:
   unsigned long runStartTime;
   uint8_t switchCount;
   unsigned long hourStartTime;
+  
+  // Указатель на storage
+  class Storage* storage;
 
 public:
   Humidifier() : running(false),
@@ -24,7 +27,13 @@ public:
                  lastSwitchTime(0),
                  runStartTime(0),
                  switchCount(0),
-                 hourStartTime(0) {}
+                 hourStartTime(0),
+                 storage(nullptr) {}
+
+  // Установка ссылки на storage
+  void setStorage(class Storage* stor) {
+    storage = stor;
+  }
 
   // Инициализация
   void begin() {
@@ -34,9 +43,17 @@ public:
   }
 
   // Автоматическое управление
-  void control(float currentHum, uint8_t minHum, uint8_t maxHum) {
+  void control(float currentHum, uint8_t minHum, uint8_t maxHum, bool sensorOK) {
     // Пропускаем, если ручной режим
     if (manualMode) return;
+
+    // Выключаем при ошибке датчика
+    if (!sensorOK) {
+      if (running) {
+        turnOffDirect(); // Прямое выключение без учета статистики
+      }
+      return;
+    }
 
     unsigned long now = millis();
 
@@ -77,6 +94,11 @@ public:
       runStartTime = millis();
       lastSwitchTime = millis();
       switchCount++;
+      
+      // Учет общего количества переключений
+      if (storage != nullptr) {
+        storage->incrementSwitchCount();
+      }
     }
   }
 
@@ -87,6 +109,12 @@ public:
       running = false;
       lastSwitchTime = millis();
     }
+  }
+
+  // Прямое выключение (без учета)
+  void turnOffDirect() {
+    digitalWrite(HUMIDIFIER_PIN, LOW);
+    running = false;
   }
 
   // Переключение (для ручного управления)

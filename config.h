@@ -72,19 +72,20 @@
 // АДРЕСА EEPROM
 // ============================================================================
 
-#define EEPROM_MAGIC_ADDR       0     // Адрес магического числа
-#define EEPROM_MAGIC_VALUE      0xAB  // Магическое число (проверка инициализации)
-#define EEPROM_MIN_HUM_ADDR     1     // Адрес минимальной влажности
-#define EEPROM_MAX_HUM_ADDR     2     // Адрес максимальной влажности
-#define EEPROM_HYSTERESIS_ADDR  3     // Адрес гистерезиса
-#define EEPROM_TEMP_CAL_ADDR    4     // Адрес калибровки температуры (4 байта float)
-#define EEPROM_HUM_CAL_ADDR     8     // Адрес калибровки влажности (4 байта float)
-#define EEPROM_WORK_TIME_ADDR   12    // Адрес времени работы (4 байта unsigned long)
+#define EEPROM_MAGIC_ADDR          0     // Адрес магического числа
+#define EEPROM_MAGIC_VALUE         0xAB  // Магическое число (проверка инициализации)
+#define EEPROM_MIN_HUM_ADDR        1     // Адрес минимальной влажности
+#define EEPROM_MAX_HUM_ADDR        2     // Адрес максимальной влажности
+#define EEPROM_HYSTERESIS_ADDR     3     // Адрес гистерезиса
+#define EEPROM_TEMP_CAL_ADDR       4     // Адрес калибровки температуры (4 байта float)
+#define EEPROM_HUM_CAL_ADDR        8     // Адрес калибровки влажности (4 байта float)
+#define EEPROM_WORK_TIME_ADDR      12    // Адрес времени работы (4 байта unsigned long)
+#define EEPROM_TOTAL_SWITCHES_ADDR 16    // Адрес общего счетчика переключений (4 байта)
 
 // ============================================================================
 // СИСТЕМНЫЕ КОНСТАНТЫ
 // ============================================================================
 
-#define FIRMWARE_VERSION        "1.2"
+#define FIRMWARE_VERSION        "1.3"
 
 #endif // CONFIG_H
