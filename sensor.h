@@ -50,15 +50,6 @@ public:
     if (isnan(h) || isnan(t)) {
       errorCount++;
       lastReadSuccess = false;
-
-      DEBUG_PRINT(F("[DHT22] Ошибка чтения. Попытка: "));
-      DEBUG_PRINTLN(errorCount);
-
-      // При 5 ошибках подряд - критическая ошибка
-      if (errorCount >= 5) {
-        DEBUG_PRINTLN(F("[DHT22] КРИТИЧЕСКАЯ ОШИБКА!"));
-      }
-
       return false;
     }
 
