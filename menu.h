@@ -294,6 +294,7 @@ public:
 
       case MENU_RESET_STATS:
         storage->resetWorkTime();
+        storage->resetSwitchCount();
         storage->save();
         break;
 
@@ -342,7 +343,8 @@ public:
     } else if (aboutMode) {
       display->drawAboutScreen(
         storage->getWorkTime(),
-        humidifier->getSwitchCount()
+        humidifier->getSwitchCount(),
+        storage->getTotalSwitches()
       );
     } else if (editMode) {
       drawEditScreen();
