@@ -69,8 +69,6 @@ public:
     editMode = false;
     encoder->resetPosition();
     lastActivityTime = millis();
-
-    DEBUG_PRINTLN(F("[Menu] Меню открыто"));
   }
 
   // Закрыть меню
@@ -80,8 +78,6 @@ public:
 
     // Сохранить настройки при выходе
     storage->save();
-
-    DEBUG_PRINTLN(F("[Menu] Меню закрыто"));
   }
 
   // Проверка активности меню
@@ -119,9 +115,6 @@ public:
       if (currentItem > MENU_EXIT) currentItem = 0;
 
       lastActivityTime = millis();
-
-      DEBUG_PRINT(F("[Menu] Пункт: "));
-      DEBUG_PRINTLN(currentItem);
     }
 
     // Короткое нажатие - выбор пункта
@@ -179,8 +172,6 @@ public:
       editMode = false;
       encoder->resetPosition();
       lastActivityTime = millis();
-
-      DEBUG_PRINTLN(F("[Menu] Редактирование отменено"));
     }
   }
 
@@ -191,37 +182,31 @@ public:
         editValue = storage->getMinHumidity();
         editMode = true;
         encoder->resetPosition();
-        DEBUG_PRINTLN(F("[Menu] Редактирование мин. влажности"));
         break;
 
       case MENU_MAX_HUMIDITY:
         editValue = storage->getMaxHumidity();
         editMode = true;
         encoder->resetPosition();
-        DEBUG_PRINTLN(F("[Menu] Редактирование макс. влажности"));
         break;
 
       case MENU_HYSTERESIS:
         editValue = storage->getHysteresis();
         editMode = true;
         encoder->resetPosition();
-        DEBUG_PRINTLN(F("[Menu] Редактирование гистерезиса"));
         break;
 
       case MENU_CALIBRATE:
         // Переход в подменю калибровки
-        DEBUG_PRINTLN(F("[Menu] Калибровка (не реализовано)"));
         break;
 
       case MENU_RESET_STATS:
         storage->resetWorkTime();
         storage->save();
-        DEBUG_PRINTLN(F("[Menu] Статистика сброшена"));
         break;
 
       case MENU_ABOUT:
         // Показать информацию о системе
-        DEBUG_PRINTLN(F("[Menu] О системе"));
         break;
 
       case MENU_EXIT:
@@ -245,9 +230,6 @@ public:
         storage->setHysteresis(editValue);
         break;
     }
-
-    DEBUG_PRINT(F("[Menu] Значение сохранено: "));
-    DEBUG_PRINTLN(editValue);
   }
 
   // Отрисовка меню
