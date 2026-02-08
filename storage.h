@@ -18,6 +18,11 @@ private:
   float tempCalibration;
   float humCalibration;
   unsigned long workTime; // Время работы в секундах
+  unsigned long totalSwitches; // Общее количество переключений
+  
+  // Защита от износа EEPROM
+  bool needsSave;
+  unsigned long lastSaveTime;
 
 public:
   Storage() : minHumidity(DEFAULT_MIN_HUMIDITY),
@@ -25,7 +30,10 @@ public:
               hysteresis(DEFAULT_HYSTERESIS),
               tempCalibration(TEMP_CALIBRATION),
               humCalibration(HUM_CALIBRATION),
-              workTime(0) {}
+              workTime(0),
+              totalSwitches(0),
+              needsSave(false),
+              lastSaveTime(0) {}
 
   // Инициализация и загрузка настроек
   void begin() {
@@ -35,7 +43,7 @@ public:
     if (magic != EEPROM_MAGIC_VALUE) {
       // Первый запуск - инициализация EEPROM
       setDefaults();
-      save();
+      saveDirect();
     } else {
       // Загрузка настроек
       load();
@@ -54,8 +62,17 @@ public:
 
     // Загрузка времени работы
     EEPROM.get(EEPROM_WORK_TIME_ADDR, workTime);
+    
+    // Загрузка общего количества переключений
+    EEPROM.get(EEPROM_TOTAL_SWITCHES_ADDR, totalSwitches);
 
     // Валидация значений
+    validateSettings();
+  }
+
+  // Валидация загруженных настроек
+  void validateSettings() {
+    // Проверка влажности
     if (minHumidity < 20 || minHumidity > 80) minHumidity = DEFAULT_MIN_HUMIDITY;
     if (maxHumidity < 30 || maxHumidity > 90) maxHumidity = DEFAULT_MAX_HUMIDITY;
     if (hysteresis < 1 || hysteresis > 20) hysteresis = DEFAULT_HYSTERESIS;
@@ -63,10 +80,27 @@ public:
       minHumidity = DEFAULT_MIN_HUMIDITY;
       maxHumidity = DEFAULT_MAX_HUMIDITY;
     }
+
+    // Проверка калибровки (на NaN и диапазон)
+    if (isnan(tempCalibration) || tempCalibration < -10.0 || tempCalibration > 10.0) {
+      tempCalibration = TEMP_CALIBRATION;
+    }
+    if (isnan(humCalibration) || humCalibration < -20.0 || humCalibration > 20.0) {
+      humCalibration = HUM_CALIBRATION;
+    }
+
+    // Проверка времени работы (не должно быть слишком большим)
+    if (workTime > 0xFFFFFFF) workTime = 0; // Сброс при невалидных значениях
+    if (totalSwitches > 0xFFFFFFF) totalSwitches = 0;
   }
 
-  // Сохранение настроек в EEPROM
+  // Сохранение настроек в EEPROM (с задержкой)
   void save() {
+    needsSave = true;
+  }
+
+  // Непосредственное сохранение (без задержки)
+  void saveDirect() {
     EEPROM.write(EEPROM_MAGIC_ADDR, EEPROM_MAGIC_VALUE);
     EEPROM.write(EEPROM_MIN_HUM_ADDR, minHumidity);
     EEPROM.write(EEPROM_MAX_HUM_ADDR, maxHumidity);
@@ -75,6 +109,18 @@ public:
     EEPROM.put(EEPROM_TEMP_CAL_ADDR, tempCalibration);
     EEPROM.put(EEPROM_HUM_CAL_ADDR, humCalibration);
     EEPROM.put(EEPROM_WORK_TIME_ADDR, workTime);
+    EEPROM.put(EEPROM_TOTAL_SWITCHES_ADDR, totalSwitches);
+
+    needsSave = false;
+    lastSaveTime = millis();
+  }
+
+  // Проверка и сохранение (вызывать в loop)
+  void tick() {
+    // Сохраняем не чаще раза в минуту для защиты EEPROM
+    if (needsSave && (millis() - lastSaveTime >= 60000)) {
+      saveDirect();
+    }
   }
 
   // Установка значений по умолчанию
@@ -85,12 +131,13 @@ public:
     tempCalibration = TEMP_CALIBRATION;
     humCalibration = HUM_CALIBRATION;
     workTime = 0;
+    totalSwitches = 0;
   }
 
   // Сброс всех настроек
   void reset() {
     setDefaults();
-    save();
+    saveDirect();
   }
 
   // Геттеры
@@ -100,36 +147,74 @@ public:
   float getTempCalibration() const { return tempCalibration; }
   float getHumCalibration() const { return humCalibration; }
   unsigned long getWorkTime() const { return workTime; }
+  unsigned long getTotalSwitches() const { return totalSwitches; }
 
   // Сеттеры
   void setMinHumidity(uint8_t value) {
-    minHumidity = constrain(value, 20, 80);
+    uint8_t newValue = constrain(value, 20, 80);
+    if (newValue != minHumidity) {
+      minHumidity = newValue;
+      save();
+    }
   }
 
   void setMaxHumidity(uint8_t value) {
-    maxHumidity = constrain(value, 30, 90);
+    uint8_t newValue = constrain(value, 30, 90);
+    if (newValue != maxHumidity) {
+      maxHumidity = newValue;
+      save();
+    }
   }
 
   void setHysteresis(uint8_t value) {
-    hysteresis = constrain(value, 1, 20);
+    uint8_t newValue = constrain(value, 1, 20);
+    if (newValue != hysteresis) {
+      hysteresis = newValue;
+      save();
+    }
   }
 
   void setTempCalibration(float value) {
-    tempCalibration = constrain(value, -10.0, 10.0);
+    float newValue = constrain(value, -10.0, 10.0);
+    if (abs(newValue - tempCalibration) > 0.01) {
+      tempCalibration = newValue;
+      save();
+    }
   }
 
   void setHumCalibration(float value) {
-    humCalibration = constrain(value, -20.0, 20.0);
+    float newValue = constrain(value, -20.0, 20.0);
+    if (abs(newValue - humCalibration) > 0.01) {
+      humCalibration = newValue;
+      save();
+    }
   }
 
   // Увеличение времени работы
   void incrementWorkTime(unsigned long seconds) {
-    workTime += seconds;
+    // Защита от переполнения
+    if (workTime < 0xFFFFFFFF - seconds) {
+      workTime += seconds;
+    }
+  }
+
+  // Увеличение счетчика переключений
+  void incrementSwitchCount() {
+    if (totalSwitches < 0xFFFFFFFF) {
+      totalSwitches++;
+    }
   }
 
   // Сброс времени работы
   void resetWorkTime() {
     workTime = 0;
+    save();
+  }
+
+  // Сброс счетчика переключений
+  void resetSwitchCount() {
+    totalSwitches = 0;
+    save();
   }
 
   // Форматирование времени работы
@@ -138,9 +223,9 @@ public:
     unsigned long minutes = (workTime % 3600) / 60;
 
     if (hours > 0) {
-      snprintf(buffer, bufferSize, "%luч %luмин", hours, minutes);
+      snprintf(buffer, bufferSize, "%luч %luм", hours, minutes);
     } else {
-      snprintf(buffer, bufferSize, "%luмин", minutes);
+      snprintf(buffer, bufferSize, "%luм", minutes);
     }
   }
 };
