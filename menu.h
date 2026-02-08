@@ -11,6 +11,8 @@
 #include "display.h"
 #include "encoder.h"
 #include "storage.h"
+#include "sensor.h"
+#include "humidifier.h"
 
 // Пункты меню
 enum MenuItem {
@@ -23,17 +25,34 @@ enum MenuItem {
   MENU_EXIT = 6
 };
 
+// Режимы калибровки
+enum CalibrationMode {
+  CAL_TEMP = 0,
+  CAL_HUM = 1
+};
+
 class Menu {
 private:
   Display* display;
   EncoderModule* encoder;
   Storage* storage;
+  Sensor* sensor;
+  Humidifier* humidifier;
 
   bool active;
   uint8_t currentItem;
   bool editMode;
   int16_t editValue;
   unsigned long lastActivityTime;
+
+  // Калибровка
+  bool calibrationMode;
+  uint8_t calibrationStep;
+  float tempCalValue;
+  float humCalValue;
+
+  // Экран "О системе"
+  bool aboutMode;
 
   const char* menuItems[7] = {
     "1.Мин.влажность",
@@ -49,17 +68,26 @@ public:
   Menu() : display(nullptr),
            encoder(nullptr),
            storage(nullptr),
+           sensor(nullptr),
+           humidifier(nullptr),
            active(false),
            currentItem(0),
            editMode(false),
            editValue(0),
-           lastActivityTime(0) {}
+           lastActivityTime(0),
+           calibrationMode(false),
+           calibrationStep(0),
+           tempCalValue(0),
+           humCalValue(0),
+           aboutMode(false) {}
 
   // Инициализация
-  void begin(Display* disp, EncoderModule* enc, Storage* stor) {
+  void begin(Display* disp, EncoderModule* enc, Storage* stor, Sensor* sens, Humidifier* hum) {
     display = disp;
     encoder = enc;
     storage = stor;
+    sensor = sens;
+    humidifier = hum;
   }
 
   // Открыть меню
@@ -67,6 +95,8 @@ public:
     active = true;
     currentItem = 0;
     editMode = false;
+    calibrationMode = false;
+    aboutMode = false;
     encoder->resetPosition();
     lastActivityTime = millis();
   }
@@ -75,6 +105,8 @@ public:
   void close() {
     active = false;
     editMode = false;
+    calibrationMode = false;
+    aboutMode = false;
 
     // Сохранить настройки при выходе
     storage->save();
@@ -95,8 +127,12 @@ public:
       return;
     }
 
-    // Обработка энкодера в режиме редактирования
-    if (editMode) {
+    // Обработка режимов
+    if (calibrationMode) {
+      handleCalibrationMode();
+    } else if (aboutMode) {
+      handleAboutMode();
+    } else if (editMode) {
       handleEditMode();
     } else {
       handleNavigationMode();
@@ -175,6 +211,57 @@ public:
     }
   }
 
+  // Режим калибровки
+  void handleCalibrationMode() {
+    int8_t delta = encoder->getDelta();
+
+    if (delta != 0) {
+      float step = 0.1;
+      if (encoder->isFastRotate()) {
+        step = 0.5;
+      }
+
+      if (calibrationStep == CAL_TEMP) {
+        tempCalValue += delta * step;
+        tempCalValue = constrain(tempCalValue, -10.0, 10.0);
+      } else {
+        humCalValue += delta * step;
+        humCalValue = constrain(humCalValue, -20.0, 20.0);
+      }
+
+      lastActivityTime = millis();
+    }
+
+    // Короткое нажатие - переключение между Т и В
+    if (encoder->isClick()) {
+      calibrationStep = (calibrationStep == CAL_TEMP) ? CAL_HUM : CAL_TEMP;
+      encoder->resetPosition();
+      lastActivityTime = millis();
+    }
+
+    // Длинное нажатие - сохранить и выйти
+    if (encoder->isLongPress()) {
+      encoder->clearLongPress();
+      storage->setTempCalibration(tempCalValue);
+      storage->setHumCalibration(humCalValue);
+      storage->save();
+      calibrationMode = false;
+      encoder->resetPosition();
+      lastActivityTime = millis();
+    }
+  }
+
+  // Режим "О системе"
+  void handleAboutMode() {
+    // Длинное нажатие - выход
+    if (encoder->isLongPress()) {
+      encoder->clearLongPress();
+      aboutMode = false;
+      encoder->resetPosition();
+      lastActivityTime = millis();
+    }
+  }
+
   // Выбор пункта меню
   void selectMenuItem() {
     switch (currentItem) {
@@ -197,7 +284,12 @@ public:
         break;
 
       case MENU_CALIBRATE:
-        // Переход в подменю калибровки
+        // Вход в режим калибровки
+        calibrationMode = true;
+        calibrationStep = CAL_TEMP;
+        tempCalValue = storage->getTempCalibration();
+        humCalValue = storage->getHumCalibration();
+        encoder->resetPosition();
         break;
 
       case MENU_RESET_STATS:
@@ -206,7 +298,8 @@ public:
         break;
 
       case MENU_ABOUT:
-        // Показать информацию о системе
+        // Показать экран "О системе"
+        aboutMode = true;
         break;
 
       case MENU_EXIT:
@@ -238,7 +331,20 @@ public:
 
     display->clear();
 
-    if (editMode) {
+    if (calibrationMode) {
+      display->drawCalibrationScreen(
+        sensor->getTemperature(),
+        sensor->getHumidity(),
+        tempCalValue,
+        humCalValue,
+        (calibrationStep == CAL_TEMP)
+      );
+    } else if (aboutMode) {
+      display->drawAboutScreen(
+        storage->getWorkTime(),
+        humidifier->getSwitchCount()
+      );
+    } else if (editMode) {
       drawEditScreen();
     } else {
       drawMenuScreen();
