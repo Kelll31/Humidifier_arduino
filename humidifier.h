@@ -8,6 +8,7 @@
 
 #include <Arduino.h>
 #include "config.h"
+#include "storage.h"
 
 class Humidifier {
 private:
@@ -19,7 +20,7 @@ private:
   unsigned long hourStartTime;
   
   // Указатель на storage
-  class Storage* storage;
+  Storage* storage;
 
 public:
   Humidifier() : running(false),
@@ -31,7 +32,7 @@ public:
                  storage(nullptr) {}
 
   // Установка ссылки на storage
-  void setStorage(class Storage* stor) {
+  void setStorage(Storage* stor) {
     storage = stor;
   }
 
