@@ -137,7 +137,7 @@ public:
   }
 
   // Экран "О системе"
-  void drawAboutScreen(unsigned long workTime, uint8_t switchCount) {
+  void drawAboutScreen(unsigned long workTime, uint8_t switchCount, unsigned long totalSwitches) {
     oled.clear();
     
     oled.setScale(1);
@@ -152,12 +152,8 @@ public:
     oled.setCursor(0, 3);
     oled.print(F("Автор: Pentester"));
 
-    oled.setCursor(0, 4);
-    oled.print(F("Сборка: "));
-    oled.print(F(__DATE__));
-
     // Время работы
-    oled.setCursor(0, 5);
+    oled.setCursor(0, 4);
     oled.print(F("Работа: "));
     if (workTime >= 3600) {
       oled.print(workTime / 3600);
@@ -166,11 +162,16 @@ public:
     oled.print((workTime % 3600) / 60);
     oled.print(F("м"));
 
-    // Количество переключений
-    oled.setCursor(0, 6);
-    oled.print(F("Перекл: "));
+    // Количество переключений в час
+    oled.setCursor(0, 5);
+    oled.print(F("Перекл:"));
     oled.print(switchCount);
     oled.print(F("/час"));
+
+    // Общее количество переключений
+    oled.setCursor(0, 6);
+    oled.print(F("Всего: "));
+    oled.print(totalSwitches);
 
     oled.setCursor(0, 7);
     oled.print(F("ДЛ-выход"));
