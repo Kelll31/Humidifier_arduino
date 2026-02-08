@@ -85,16 +85,11 @@
 // ОТЛАДКА
 // ============================================================================
 
-#define DEBUG_MODE              true  // Включить отладочные сообщения
+#define DEBUG_MODE              false  // ОТКЛЮЧЕНО для экономии памяти
 
-// Макрос для отладочного вывода
-#if DEBUG_MODE
-  #define DEBUG_PRINT(x)    Serial.print(x)
-  #define DEBUG_PRINTLN(x)  Serial.println(x)
-#else
-  #define DEBUG_PRINT(x)
-  #define DEBUG_PRINTLN(x)
-#endif
+// Пустые макросы для совместимости
+#define DEBUG_PRINT(x)
+#define DEBUG_PRINTLN(x)
 
 // ============================================================================
 // СИСТЕМНЫЕ КОНСТАНТЫ
