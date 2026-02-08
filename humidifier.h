@@ -44,12 +44,10 @@ public:
     if (now - hourStartTime >= 3600000) {
       switchCount = 0;
       hourStartTime = now;
-      DEBUG_PRINTLN(F("[Humidifier] Сброс счетчика переключений"));
     }
 
     // Проверка на максимум переключений
     if (switchCount >= MAX_SWITCHES_PER_HOUR) {
-      DEBUG_PRINTLN(F("[Humidifier] Достигнут лимит переключений!"));
       if (running) {
         turnOff();
       }
@@ -61,16 +59,12 @@ public:
       // Включить увлажнитель
       if (now - lastSwitchTime >= MIN_PAUSE_TIME) {
         turnOn();
-        DEBUG_PRINT(F("[Humidifier] Включен. Влажность: "));
-        DEBUG_PRINTLN(currentHum);
       }
     }
     else if (running && currentHum >= maxHum) {
       // Выключить увлажнитель
       if (now - runStartTime >= MIN_RUN_TIME) {
         turnOff();
-        DEBUG_PRINT(F("[Humidifier] Выключен. Влажность: "));
-        DEBUG_PRINTLN(currentHum);
       }
     }
   }
@@ -83,8 +77,6 @@ public:
       runStartTime = millis();
       lastSwitchTime = millis();
       switchCount++;
-
-      DEBUG_PRINTLN(F("[Humidifier] >>> ВКЛ <<<"));
     }
   }
 
@@ -94,8 +86,6 @@ public:
       digitalWrite(HUMIDIFIER_PIN, LOW);
       running = false;
       lastSwitchTime = millis();
-
-      DEBUG_PRINTLN(F("[Humidifier] >>> ВЫКЛ <<<"));
     }
   }
 
@@ -107,14 +97,11 @@ public:
       turnOn();
     }
     manualMode = true;
-    DEBUG_PRINT(F("[Humidifier] Ручной режим: "));
-    DEBUG_PRINTLN(running ? F("ВКЛ") : F("ВЫКЛ"));
   }
 
   // Выход из ручного режима
   void exitManualMode() {
     manualMode = false;
-    DEBUG_PRINTLN(F("[Humidifier] Автоматический режим"));
   }
 
   // Проверка состояния
