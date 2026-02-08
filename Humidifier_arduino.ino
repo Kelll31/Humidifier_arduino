@@ -12,7 +12,7 @@
  * 
  * Автор: Pentester
  * Дата: 2026-02-08
- * Версия: 1.0
+ * Версия: 1.1 - Оптимизация памяти
  */
 
 #include "config.h"
@@ -36,41 +36,25 @@ unsigned long lastUpdateTime = 0;
 unsigned long lastSaveTime = 0;
 
 void setup() {
-  // Инициализация Serial для отладки
-  Serial.begin(9600);
-  Serial.println(F("================================="));
-  Serial.println(F("  АВТОМАТИЧЕСКИЙ УВЛАЖНИТЕЛЬ"));
-  Serial.println(F("================================="));
-
   // Загрузка настроек из EEPROM
   storage.begin();
-  Serial.println(F("[OK] Настройки загружены"));
 
   // Инициализация дисплея
   display.begin();
   display.showSplash();
   delay(2000);
-  Serial.println(F("[OK] Дисплей инициализирован"));
 
   // Инициализация датчика
   sensor.begin();
-  Serial.println(F("[OK] Датчик DHT22 инициализирован"));
 
   // Инициализация энкодера
   encoder.begin();
-  Serial.println(F("[OK] Энкодер инициализирован"));
 
   // Инициализация увлажнителя
   humidifier.begin();
-  Serial.println(F("[OK] Увлажнитель инициализирован"));
 
   // Инициализация меню
   menu.begin(&display, &encoder, &storage);
-  Serial.println(F("[OK] Меню инициализировано"));
-
-  Serial.println(F("================================="));
-  Serial.println(F("  СИСТЕМА ГОТОВА К РАБОТЕ!"));
-  Serial.println(F("================================="));
 
   // Включение watchdog timer (защита от зависания)
   wdt_enable(WDTO_4S);
@@ -89,15 +73,7 @@ void loop() {
 
     // Чтение данных с DHT22
     if (sensor.update()) {
-      float temp = sensor.getTemperature();
       float hum = sensor.getHumidity();
-
-      // Логирование данных
-      Serial.print(F("Температура: "));
-      Serial.print(temp, 1);
-      Serial.print(F("°C | Влажность: "));
-      Serial.print(hum, 1);
-      Serial.println(F("%"));
 
       // Управление увлажнителем
       humidifier.control(hum, storage.getMinHumidity(), storage.getMaxHumidity());
@@ -108,7 +84,6 @@ void loop() {
       }
 
     } else {
-      Serial.println(F("[ERROR] Ошибка чтения DHT22!"));
       // Мигание LED2 при ошибке
       humidifier.blinkError();
     }
@@ -134,7 +109,6 @@ void loop() {
   if (millis() - lastSaveTime >= AUTOSAVE_INTERVAL) {
     lastSaveTime = millis();
     storage.save();
-    Serial.println(F("[OK] Автосохранение настроек"));
   }
 
   // Небольшая задержка для стабильности
