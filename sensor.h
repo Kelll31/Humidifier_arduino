@@ -9,6 +9,7 @@
 #include <Arduino.h>
 #include <DHT.h>
 #include "config.h"
+#include "storage.h"
 
 class Sensor {
 private:
@@ -23,7 +24,7 @@ private:
   uint8_t consecutiveErrors;
   
   // Указатель на storage для калибровки
-  class Storage* storage;
+  Storage* storage;
 
 public:
   Sensor() : dht(DHT_PIN, DHT_TYPE), 
@@ -38,7 +39,7 @@ public:
              storage(nullptr) {}
 
   // Установка ссылки на storage
-  void setStorage(class Storage* stor) {
+  void setStorage(Storage* stor) {
     storage = stor;
   }
 
