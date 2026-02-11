@@ -1,7 +1,6 @@
 /*
- * МОДУЛЬ ДИСПЛЕЯ OLED 128x64 v1.7.1
- * Отрисовка интерфейса с графиком влажности и индикаторами
- * ИСПРАВЛЕНО: отображение текста на главном экране
+ * МОДУЛЬ ДИСПЛЕЯ OLED 128x64 v1.7.2
+ * 2 режима главного экрана: ДАННЫЕ и ГРАФИК (переключение энкодером)
  */
 
 #ifndef DISPLAY_H
@@ -14,8 +13,11 @@
 GyverOLED<SSD1306_128x64, OLED_BUFFER> oled;
 
 #define GRAPH_POINTS 32
-#define GRAPH_Y      20
-#define GRAPH_H      44
+
+enum DisplayMode {
+  MODE_DATA = 0,   // Режим данных без графика
+  MODE_GRAPH = 1   // Режим графика на весь экран
+};
 
 class Display {
 private:
@@ -27,9 +29,11 @@ private:
   bool lastSensorOK;
   bool lastWaterLow;
   bool lastWindowOpen;
+  DisplayMode lastMode;
   bool firstDraw;
   
   uint8_t currentBrightness;
+  DisplayMode currentMode;
 
   uint8_t humGraph[GRAPH_POINTS];
   uint32_t humState;
@@ -40,7 +44,8 @@ public:
   Display() : lastTemp(-999), lastHum(-999), lastTargetHum(0),
               lastRunning(false), lastWorkTime(0), lastSensorOK(true),
               lastWaterLow(false), lastWindowOpen(false),
-              firstDraw(true), currentBrightness(BRIGHTNESS_FULL),
+              lastMode(MODE_DATA), firstDraw(true),
+              currentBrightness(BRIGHTNESS_FULL), currentMode(MODE_DATA),
               gIdx(0), gFull(false), humState(0) {
     memset(humGraph, 0, sizeof(humGraph));
   }
@@ -48,10 +53,8 @@ public:
   void begin() {
     oled.init();
     oled.clear();
-    
     oled.sendCommand(0xD5);
     oled.sendCommand(0xF0);
-    
     setBrightness(BRIGHTNESS_FULL);
   }
 
@@ -64,6 +67,16 @@ public:
   
   uint8_t getBrightness() const {
     return currentBrightness;
+  }
+  
+  // Переключение режима
+  void toggleMode() {
+    currentMode = (currentMode == MODE_DATA) ? MODE_GRAPH : MODE_DATA;
+    firstDraw = true;
+  }
+  
+  DisplayMode getMode() const {
+    return currentMode;
   }
 
   void showSplash() {
@@ -105,13 +118,14 @@ public:
     }
   }
 
-  void drawGraph() {
+  void drawFullGraph() {
     uint8_t cnt = gFull ? GRAPH_POINTS : gIdx;
     
-    oled.line(0, GRAPH_Y, 127, GRAPH_Y);
+    // Рамка на весь экран
+    oled.line(0, 0, 127, 0);
     oled.line(0, 63, 127, 63);
-    oled.line(0, GRAPH_Y, 0, 63);
-    oled.line(127, GRAPH_Y, 127, 63);
+    oled.line(0, 0, 0, 63);
+    oled.line(127, 0, 127, 63);
     
     if (cnt == 0) return;
 
@@ -129,8 +143,9 @@ public:
     }
     if (hi == lo) hi = lo + 1;
 
+    // Метки
     oled.setScale(1);
-    oled.setCursor(2, 3);
+    oled.setCursor(2, 0);
     oled.print(hi);
     oled.setCursor(2, 7);
     oled.print(lo);
@@ -141,15 +156,9 @@ public:
       uint8_t dataIdx = gFull ? ((gIdx + i) % GRAPH_POINTS) : i;
       uint8_t v = humGraph[dataIdx];
 
-      uint8_t px;
-      if (cnt == 1) {
-        px = 126;
-      } else {
-        px = 126 - (uint16_t)(cnt - 1 - i) * 124 / (cnt - 1);
-      }
-
-      uint8_t py = 61 - (uint16_t)(v - lo) * (63 - GRAPH_Y - 4) / (hi - lo);
-      if (py < GRAPH_Y + 2) py = GRAPH_Y + 2;
+      uint8_t px = 126 - (cnt == 1 ? 0 : (uint16_t)(cnt - 1 - i) * 124 / (cnt - 1));
+      uint8_t py = 61 - (uint16_t)(v - lo) * 59 / (hi - lo);
+      if (py < 2) py = 2;
       if (py > 61) py = 61;
 
       if (prevPx >= 0) {
@@ -167,19 +176,21 @@ public:
     }
   }
 
-  // Главный экран с индикаторами
+  // Главный экран с выбором режима
   void drawMainScreen(float temp, float hum, uint8_t targetHum,
                       bool running, unsigned long workTime, bool sensorOK,
                       bool waterLow = false, bool windowOpen = false) {
     bool changed = false;
-    if (firstDraw || sensorOK != lastSensorOK) changed = true;
-    if (firstDraw || waterLow != lastWaterLow) changed = true;
-    if (firstDraw || windowOpen != lastWindowOpen) changed = true;
-    if (firstDraw || fabs(temp - lastTemp) >= 0.1) changed = true;
-    if (firstDraw || fabs(hum - lastHum) >= 0.1) changed = true;
-    if (firstDraw || targetHum != lastTargetHum) changed = true;
-    if (firstDraw || running != lastRunning) changed = true;
-    if (firstDraw || (workTime / 60) != (lastWorkTime / 60)) changed = true;
+    if (firstDraw) changed = true;
+    if (currentMode != lastMode) changed = true;
+    if (sensorOK != lastSensorOK) changed = true;
+    if (waterLow != lastWaterLow) changed = true;
+    if (windowOpen != lastWindowOpen) changed = true;
+    if (fabs(temp - lastTemp) >= 0.1) changed = true;
+    if (fabs(hum - lastHum) >= 0.1) changed = true;
+    if (targetHum != lastTargetHum) changed = true;
+    if (running != lastRunning) changed = true;
+    if ((workTime / 60) != (lastWorkTime / 60)) changed = true;
 
     if (!changed) return;
 
@@ -187,10 +198,10 @@ public:
 
     if (!sensorOK) {
       oled.setScale(2);
-      oled.setCursor(15, 3);
+      oled.setCursor(2, 3);
       oled.print(F("ОШИБКА"));
       oled.setScale(1);
-      oled.setCursor(20, 6);
+      oled.setCursor(3, 6);
       oled.print(F("Датчик DHT22"));
       oled.update();
       lastSensorOK = sensorOK;
@@ -198,38 +209,66 @@ public:
       return;
     }
 
-    // Верхняя строка: температура и влажность
-    oled.setScale(2);
-    oled.setCursor(0, 0);
-    if (temp >= -40 && temp <= 80) {
-      oled.print(temp, 1);
+    if (currentMode == MODE_DATA) {
+      // РЕЖИМ ДАННЫХ (без графика)
+      oled.setScale(2);
+      
+      // Температура
+      oled.setCursor(0, 0);
+      oled.print(F("Т:"));
+      if (temp >= -40 && temp <= 80) {
+        oled.print(temp, 1);
+      } else {
+        oled.print(F("--"));
+      }
+      oled.print(F("C"));
+      
+      // Влажность
+      oled.setCursor(0, 2);
+      oled.print(F("В:"));
+      if (hum >= 0 && hum <= 100) {
+        oled.print(hum, 1);
+      } else {
+        oled.print(F("--"));
+      }
+      oled.print(F("%"));
+      
+      // Уставка
+      oled.setCursor(0, 4);
+      oled.print(F("Уст:"));
+      oled.print(targetHum);
+      oled.print(F("%"));
+      
+      oled.setScale(1);
+      
+      // Статус
+      oled.setCursor(0, 6);
+      oled.print(F("Статус: "));
+      if (waterLow) {
+        oled.print(F("НЕТ ВОДЫ!"));
+      } else if (windowOpen) {
+        oled.print(F("ОКНО"));
+      } else if (running) {
+        oled.print(F("РАБОТАЕТ"));
+      } else {
+        oled.print(F("ОЖИДАНИЕ"));
+      }
+      
+      // Время работы
+      oled.setCursor(0, 7);
+      oled.print(F("Работа:"));
+      if (workTime >= 3600) {
+        oled.print(workTime / 3600);
+        oled.print(F("ч"));
+      }
+      oled.print((workTime % 3600) / 60);
+      oled.print(F("м"));
+      
     } else {
-      oled.print(F("--"));
+      // РЕЖИМ ГРАФИКА (на весь экран)
+      oled.setScale(1);
+      drawFullGraph();
     }
-    oled.print(F("C"));
-
-    oled.setCursor(9, 0);
-    if (hum >= 0 && hum <= 100) {
-      oled.print(hum, 1);
-    } else {
-      oled.print(F("--"));
-    }
-    oled.print(F("%"));
-    
-    // Индикаторы статуса (правый верхний угол)
-    oled.setScale(1);
-    if (waterLow) {
-      oled.setCursor(14, 0);
-      oled.print(F("W!"));  // Water Low
-    }
-    if (windowOpen) {
-      oled.setCursor(12, 0);
-      oled.print(F("O"));   // Open window
-    }
-
-    // График
-    oled.setScale(1);
-    drawGraph();
 
     oled.update();
 
@@ -241,6 +280,7 @@ public:
     lastSensorOK = sensorOK;
     lastWaterLow = waterLow;
     lastWindowOpen = windowOpen;
+    lastMode = currentMode;
     firstDraw = false;
   }
 
@@ -248,7 +288,7 @@ public:
                        unsigned long totalSwitches) {
     oled.clear();
     oled.setScale(1);
-    oled.setCursor(20, 0);
+    oled.setCursor(3, 0);
     oled.print(F("О СИСТЕМЕ"));
     oled.line(0, 10, 127, 10);
     oled.setCursor(0, 2);
@@ -265,9 +305,9 @@ public:
     oled.print((workTime % 3600) / 60);
     oled.print(F("м"));
     oled.setCursor(0, 5);
-    oled.print(F("Перекл:"));
+    oled.print(F("Перекл: "));
     oled.print(switchCount);
-    oled.print(F("/час"));
+    oled.print(F("/ч"));
     oled.setCursor(0, 6);
     oled.print(F("Всего: "));
     oled.print(totalSwitches);
@@ -280,13 +320,13 @@ public:
                              float tempCal, float humCal, bool editingTemp) {
     oled.clear();
     oled.setScale(1);
-    oled.setCursor(15, 0);
+    oled.setCursor(2, 0);
     oled.print(F("КАЛИБРОВКА"));
     oled.line(0, 10, 127, 10);
     oled.setCursor(0, 2);
-    oled.print(F("Т: "));
+    oled.print(F("Т:"));
     oled.print(currentTemp, 1);
-    oled.print(F("C  В: "));
+    oled.print(F("C В:"));
     oled.print(currentHum, 1);
     oled.print(F("%"));
     oled.setCursor(0, 4);
@@ -302,7 +342,7 @@ public:
     oled.print(humCal, 1);
     oled.print(F("%"));
     oled.setCursor(0, 7);
-    oled.print(F("ДН-след ДЛ-OK"));
+    oled.print(F("КН-след ДЛ-OK"));
     oled.update();
   }
 
