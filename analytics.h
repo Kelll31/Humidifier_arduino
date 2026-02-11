@@ -1,5 +1,5 @@
 /*
- * МОДУЛЬ АНАЛИТИКИ
+ * МОДУЛЬ АНАЛИТИКИ v1.7
  * Расширенная статистика, детектор окна, датчик воды, адаптивное обучение
  */
 
@@ -36,6 +36,7 @@ private:
   
   // Датчик воды
   bool waterLow;
+  bool waterSensorPresent;
   unsigned long lastWaterCheck;
   
   // Адаптивное обучение (минимальное использование RAM)
@@ -47,12 +48,27 @@ public:
   Analytics() : currentHour(255), tempSum(0), humSum(0), sampleCount(0),
                 hourRunTime(0), hourSwitches(0), baselineTemp(20.0),
                 tempDropCount(0), windowOpen(false), lastWindowCheck(0),
-                waterLow(false), lastWaterCheck(0), learnedMinHum(0),
-                learnedMaxHum(0), learningEnabled(LEARNING_ENABLED) {}
+                waterLow(false), waterSensorPresent(false), lastWaterCheck(0),
+                learnedMinHum(0), learnedMaxHum(0), learningEnabled(LEARNING_ENABLED) {}
 
   // Инициализация
   void begin() {
     pinMode(WATER_LEVEL_PIN, INPUT);
+    
+    // Проверка наличия датчика воды при старте
+    delay(100); // Даем время стабилизироваться
+    int initialReading = analogRead(WATER_LEVEL_PIN);
+    
+    // Если значение в разумных пределах (50-900) - датчик подключен
+    // Если 0-10 или 1000-1023 - скорее всего не подключен
+    if (initialReading > 50 && initialReading < 900) {
+      waterSensorPresent = true;
+      waterLow = (initialReading < WATER_THRESHOLD);
+    } else {
+      waterSensorPresent = false;
+      waterLow = false; // Не блокируем работу если датчика нет
+    }
+    
     loadLearningData();
   }
 
@@ -61,6 +77,11 @@ public:
   // ========================================
   
   bool checkWaterLevel() {
+    // Если датчик не обнаружен - всегда возвращаем OK
+    if (!waterSensorPresent) {
+      return true;
+    }
+    
     // Проверка каждые 5 секунд
     if (millis() - lastWaterCheck < 5000) {
       return !waterLow;
@@ -68,7 +89,10 @@ public:
     
     lastWaterCheck = millis();
     
-    // Резистивный датчик: чем больше воды - тем меньше сопротивление
+    // Резистивный датчик: чем больше воды - тем ВЫШЕ сопротивление и ВЫШЕ сигнал
+    // Для показанного датчика: вода замыкает контакты, уменьшает сопротивление
+    // Много воды = высокий сигнал (700-900)
+    // Мало воды = низкий сигнал (100-300)
     int waterLevel = analogRead(WATER_LEVEL_PIN);
     waterLow = (waterLevel < WATER_THRESHOLD);
     
@@ -76,7 +100,16 @@ public:
   }
   
   bool isWaterLow() const {
-    return waterLow;
+    return waterLow && waterSensorPresent;
+  }
+  
+  bool isWaterSensorPresent() const {
+    return waterSensorPresent;
+  }
+  
+  int getWaterLevel() const {
+    if (!waterSensorPresent) return -1;
+    return analogRead(WATER_LEVEL_PIN);
   }
 
   // ========================================
