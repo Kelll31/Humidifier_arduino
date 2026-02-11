@@ -348,8 +348,6 @@ public:
     if (!needRedraw) return;
     needRedraw = false;
 
-    display->clear();
-
     if (calibrationMode) {
       display->drawCalibrationScreen(
         sensor->getTemperature(),
@@ -358,23 +356,30 @@ public:
         humCalValue,
         (calibrationStep == CAL_TEMP)
       );
-    } else if (aboutMode) {
+      return;
+    }
+    
+    if (aboutMode) {
       display->drawAboutScreen(
         storage->getWorkTime(),
         humidifier->getSwitchCount(),
         storage->getTotalSwitches()
       );
-    } else if (editMode) {
-      drawEditScreen();
-    } else {
-      drawMenuScreen();
+      return;
     }
-
-    display->update();
+    
+    if (editMode) {
+      drawEditScreen();
+      return;
+    }
+    
+    drawMenuScreen();
   }
 
   // Отрисовка экрана меню
   void drawMenuScreen() {
+    display->clear();
+    
     // Заголовок
     display->setScale(1);
     display->setCursor(40, 0);
@@ -407,10 +412,14 @@ public:
     // Подсказка
     display->setCursor(0, 7);
     display->print(F("ДН-выб ДЛ-выход"));
+    
+    display->update();
   }
 
   // Отрисовка экрана редактирования
   void drawEditScreen() {
+    display->clear();
+    
     display->setScale(1);
     display->setCursor(20, 0);
     display->print(F("НАСТРОЙКА"));
@@ -436,6 +445,8 @@ public:
     // Подсказка
     display->setCursor(0, 7);
     display->print(F("ДН-OK ДЛ-отмена"));
+    
+    display->update();
   }
 };
 
