@@ -45,9 +45,9 @@ public:
               graphIndex(0),
               graphFilled(false),
               humidifierState(0) {
-    // Инициализация графика
+    // Инициализация графика нулями
     for (uint8_t i = 0; i < GRAPH_POINTS; i++) {
-      humidityGraph[i] = 50;
+      humidityGraph[i] = 0;
     }
   }
 
@@ -93,19 +93,15 @@ public:
 
   // Отрисовка графика влажности
   void drawHumidityGraph(uint8_t x, uint8_t y, uint8_t width, uint8_t height) {
-    uint8_t pointsToShow = graphFilled ? GRAPH_POINTS : graphIndex;
-    
-    // Если меньше 2 точек - показываем только рамку с текстом
-    if (pointsToShow < 2) {
-      oled.rect(x, y, x + width - 1, y + height - 1);
-      oled.setScale(1);
-      oled.setCursor(x + 25, y + height / 2);
-      oled.print(F("Накопление..."));
-      return;
-    }
-
     // Рамка графика
     oled.rect(x, y, x + width - 1, y + height - 1);
+    
+    uint8_t pointsToShow = graphFilled ? GRAPH_POINTS : graphIndex;
+    
+    // Если нет данных - просто пустой график
+    if (pointsToShow == 0) {
+      return;
+    }
 
     // Находим min/max для масштабирования
     uint8_t minHum = 100, maxHum = 0;
@@ -126,32 +122,36 @@ public:
     if (maxHum + range / 10 <= 100) maxHum += range / 10;
     else maxHum = 100;
 
-    // Рисуем график
-    for (uint8_t i = 1; i < pointsToShow; i++) {
-      uint8_t idx1 = graphFilled ? (graphIndex + i - 1) % GRAPH_POINTS : i - 1;
-      uint8_t idx2 = graphFilled ? (graphIndex + i) % GRAPH_POINTS : i;
-
-      uint8_t hum1 = humidityGraph[idx1];
-      uint8_t hum2 = humidityGraph[idx2];
-
-      // Нормализация в координаты экрана
-      uint8_t x1 = x + 1 + ((i - 1) * (width - 2)) / (pointsToShow - 1);
-      uint8_t x2 = x + 1 + (i * (width - 2)) / (pointsToShow - 1);
+    // Рисуем график справа налево (новые данные справа)
+    for (uint8_t i = 0; i < pointsToShow; i++) {
+      uint8_t idx = graphFilled ? (graphIndex + i) % GRAPH_POINTS : i;
+      uint8_t h = humidityGraph[idx];
       
-      uint8_t y1 = y + height - 2 - ((hum1 - minHum) * (height - 3)) / (maxHum - minHum);
-      uint8_t y2 = y + height - 2 - ((hum2 - minHum) * (height - 3)) / (maxHum - minHum);
-
-      // Ограничение координат
-      y1 = constrain(y1, y + 1, y + height - 2);
-      y2 = constrain(y2, y + 1, y + height - 2);
-
-      // Линия графика
-      oled.line(x1, y1, x2, y2);
-
+      // Координата X справа налево
+      uint8_t xPos = x + width - 2 - (i * (width - 2)) / GRAPH_POINTS;
+      
+      // Координата Y
+      uint8_t yPos = y + height - 2 - ((h - minHum) * (height - 3)) / (maxHum - minHum);
+      yPos = constrain(yPos, y + 1, y + height - 2);
+      
+      // Рисуем точку
+      oled.dot(xPos, yPos);
+      
+      // Линия к предыдущей точке
+      if (i > 0) {
+        uint8_t prevIdx = graphFilled ? (graphIndex + i - 1) % GRAPH_POINTS : i - 1;
+        uint8_t prevH = humidityGraph[prevIdx];
+        uint8_t prevX = x + width - 2 - ((i - 1) * (width - 2)) / GRAPH_POINTS;
+        uint8_t prevY = y + height - 2 - ((prevH - minHum) * (height - 3)) / (maxHum - minHum);
+        prevY = constrain(prevY, y + 1, y + height - 2);
+        
+        oled.line(prevX, prevY, xPos, yPos);
+      }
+      
       // Отметки включения увлажнителя
-      if (bitRead(humidifierState, idx2) && x2 >= x + 1 && x2 <= x + width - 2) {
-        oled.dot(x2, y + height - 3);
-        oled.dot(x2, y + height - 4);
+      if (bitRead(humidifierState, idx)) {
+        oled.dot(xPos, y + height - 3);
+        oled.dot(xPos, y + height - 4);
       }
     }
   }
@@ -204,7 +204,7 @@ public:
       }
       oled.print(F("%"));
 
-      // График влажности внизу (занимает остальную часть экрана)
+      // График влажности внизу (занимает оставшуюся часть экрана)
       drawHumidityGraph(0, 16, 128, GRAPH_HEIGHT);
 
       oled.update();
