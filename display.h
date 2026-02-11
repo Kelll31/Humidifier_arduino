@@ -25,6 +25,8 @@ private:
   unsigned long lastWorkTime;
   bool lastSensorOK;
   bool firstDraw;
+  
+  uint8_t currentBrightness;
 
   uint8_t humGraph[GRAPH_POINTS];
   uint32_t humState;
@@ -34,7 +36,8 @@ private:
 public:
   Display() : lastTemp(-999), lastHum(-999), lastTargetHum(0),
               lastRunning(false), lastWorkTime(0), lastSensorOK(true),
-              firstDraw(true), gIdx(0), gFull(false), humState(0) {
+              firstDraw(true), currentBrightness(BRIGHTNESS_FULL),
+              gIdx(0), gFull(false), humState(0) {
     memset(humGraph, 0, sizeof(humGraph));
   }
 
@@ -50,7 +53,20 @@ public:
     oled.sendCommand(0xD5);  // Set Display Clock Divide Ratio/Oscillator Frequency
     oled.sendCommand(0xF0);  // Максимальная частота: Fosc на максимум, делитель = 1
     
-    oled.setContrast(255);
+    setBrightness(BRIGHTNESS_FULL);
+  }
+
+  // Установка яркости дисплея
+  void setBrightness(uint8_t brightness) {
+    if (currentBrightness != brightness) {
+      currentBrightness = brightness;
+      oled.setContrast(brightness);
+    }
+  }
+  
+  // Получение текущей яркости
+  uint8_t getBrightness() const {
+    return currentBrightness;
   }
 
   void showSplash() {
