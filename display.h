@@ -1,6 +1,7 @@
 /*
- * МОДУЛЬ ДИСПЛЕЯ OLED 128x64 v1.7
+ * МОДУЛЬ ДИСПЛЕЯ OLED 128x64 v1.7.1
  * Отрисовка интерфейса с графиком влажности и индикаторами
+ * ИСПРАВЛЕНО: отображение текста на главном экране
  */
 
 #ifndef DISPLAY_H
@@ -199,7 +200,7 @@ public:
 
     // Верхняя строка: температура и влажность
     oled.setScale(2);
-    oled.setCursorXY(0, 0);
+    oled.setCursor(0, 0);
     if (temp >= -40 && temp <= 80) {
       oled.print(temp, 1);
     } else {
@@ -207,7 +208,7 @@ public:
     }
     oled.print(F("C"));
 
-    oled.setCursorXY(70, 0);
+    oled.setCursor(9, 0);
     if (hum >= 0 && hum <= 100) {
       oled.print(hum, 1);
     } else {
@@ -218,11 +219,11 @@ public:
     // Индикаторы статуса (правый верхний угол)
     oled.setScale(1);
     if (waterLow) {
-      oled.setCursorXY(110, 0);
+      oled.setCursor(14, 0);
       oled.print(F("W!"));  // Water Low
     }
     if (windowOpen) {
-      oled.setCursorXY(100, 0);
+      oled.setCursor(12, 0);
       oled.print(F("O"));   // Open window
     }
 
