@@ -13,8 +13,8 @@
 GyverOLED<SSD1306_128x64, OLED_BUFFER> oled;
 
 #define GRAPH_POINTS 32
-#define GRAPH_Y      16
-#define GRAPH_H      48
+#define GRAPH_Y      20
+#define GRAPH_H      44
 
 class Display {
 private:
@@ -97,9 +97,9 @@ public:
 
     // Мин/макс метки
     oled.setScale(1);
-    oled.setCursor(2, 2);    // строка 2 = y16
+    oled.setCursor(2, 3);    // строка 3 = y24 (под температурой)
     oled.print(hi);
-    oled.setCursor(2, 6);    // строка 6 = y48
+    oled.setCursor(2, 7);    // строка 7 = y56
     oled.print(lo);
 
     // Рисуем линию графика (новые данные справа)
@@ -118,7 +118,7 @@ public:
       }
 
       // Y: мапим значение в пиксели (GRAPH_Y+2 .. 61)
-      uint8_t py = 61 - (uint16_t)(v - lo) * 43 / (hi - lo);
+      uint8_t py = 61 - (uint16_t)(v - lo) * (63 - GRAPH_Y - 4) / (hi - lo);
       if (py < GRAPH_Y + 2) py = GRAPH_Y + 2;
       if (py > 61) py = 61;
 
