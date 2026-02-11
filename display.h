@@ -1,6 +1,6 @@
 /*
- * МОДУЛЬ ДИСПЛЕЯ OLED 128x64 v1.7.5
- * ФИНАЛЬНОЕ ИСПРАВЛЕНИЕ: правильные пиксельные координаты
+ * МОДУЛЬ ДИСПЛЕЯ OLED 128x64 v1.7.6
+ * ИСПРАВЛЕНИЕ: добавлен метод setCursorXY для меню
  */
 
 #ifndef DISPLAY_H
@@ -336,6 +336,11 @@ public:
 
   void setCursor(uint8_t x, uint8_t y) {
     oled.setCursor(x, y);
+  }
+
+  // ДОБАВЛЕНО: метод setCursorXY для использования в меню
+  void setCursorXY(uint8_t x, uint8_t y) {
+    oled.setCursorXY(x, y);
   }
 
   void print(const char* t) { oled.print(t); }
