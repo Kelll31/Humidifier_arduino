@@ -1,6 +1,6 @@
 /*
- * МОДУЛЬ ДИСПЛЕЯ OLED 128x64 v1.7.3
- * 2 режима главного экрана: ДАННЫЕ и ГРАФИК
+ * МОДУЛЬ ДИСПЛЕЯ OLED 128x64 v1.7.4
+ * КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: правильные координаты текста
  */
 
 #ifndef DISPLAY_H
@@ -84,8 +84,8 @@ public:
     oled.setCursor(0, 2);
     oled.print(F("УВЛАЖНИТЕЛЬ"));
     oled.setScale(1);
-    oled.setCursor(30, 6);
-    oled.print(F("Версия "));
+    oled.setCursor(3, 6);
+    oled.print(F("v"));
     oled.print(FIRMWARE_VERSION);
     oled.update();
   }
@@ -127,9 +127,9 @@ public:
     if (hi == lo) hi = lo + 1;
 
     oled.setScale(1);
-    oled.setCursor(2, 0);
+    oled.setCursor(1, 0);
     oled.print(hi);
-    oled.setCursor(2, 7);
+    oled.setCursor(1, 7);
     oled.print(lo);
 
     int16_t prevPx = -1, prevPy = -1;
@@ -179,11 +179,11 @@ public:
 
     if (!sensorOK) {
       oled.setScale(2);
-      oled.setCursor(2, 3);
+      oled.setCursor(1, 2);
       oled.print(F("ОШИБКА"));
       oled.setScale(1);
-      oled.setCursor(3, 6);
-      oled.print(F("Датчик DHT22"));
+      oled.setCursor(2, 5);
+      oled.print(F("DHT22"));
       oled.update();
       lastSensorOK = sensorOK;
       firstDraw = false;
@@ -191,10 +191,12 @@ public:
     }
 
     if (currentMode == MODE_DATA) {
-      oled.setScale(2);
+      // РЕЖИМ ДАННЫХ - всё в одну строку компактно
+      oled.setScale(1);
       
+      // Строка 0: Температура
       oled.setCursor(0, 0);
-      oled.print(F("Т:"));
+      oled.print(F("T:"));
       if (temp >= -40 && temp <= 80) {
         oled.print(temp, 1);
       } else {
@@ -202,8 +204,9 @@ public:
       }
       oled.print(F("C"));
       
-      oled.setCursor(0, 2);
-      oled.print(F("В:"));
+      // Строка 1: Влажность
+      oled.setCursor(0, 1);
+      oled.print(F("H:"));
       if (hum >= 0 && hum <= 100) {
         oled.print(hum, 1);
       } else {
@@ -211,27 +214,30 @@ public:
       }
       oled.print(F("%"));
       
-      oled.setCursor(0, 4);
-      oled.print(F("Уст:"));
+      // Строка 2: Уставка
+      oled.setCursor(0, 2);
+      oled.print(F("SET:"));
       oled.print(targetHum);
       oled.print(F("%"));
       
-      oled.setScale(1);
+      // Линия разделитель
+      oled.line(0, 28, 127, 28);
       
-      oled.setCursor(0, 6);
-      oled.print(F("Статус: "));
+      // Строка 4: Статус
+      oled.setCursor(0, 4);
       if (waterLow) {
         oled.print(F("НЕТ ВОДЫ!"));
       } else if (windowOpen) {
-        oled.print(F("ОКНО"));
+        oled.print(F("ОКНО ОТКР."));
       } else if (running) {
         oled.print(F("РАБОТАЕТ"));
       } else {
         oled.print(F("ОЖИДАНИЕ"));
       }
       
-      oled.setCursor(0, 7);
-      oled.print(F("Работа:"));
+      // Строка 6: Время работы
+      oled.setCursor(0, 6);
+      oled.print(F("Раб: "));
       if (workTime >= 3600) {
         oled.print(workTime / 3600);
         oled.print(F("ч"));
@@ -239,7 +245,12 @@ public:
       oled.print((workTime % 3600) / 60);
       oled.print(F("м"));
       
+      // Подсказка снизу
+      oled.setCursor(0, 7);
+      oled.print(F("Врщ=Граф ДН=Меню"));
+      
     } else {
+      // РЕЖИМ ГРАФИКА
       oled.setScale(1);
       drawFullGraph();
     }
@@ -262,28 +273,28 @@ public:
                        unsigned long totalSwitches) {
     oled.clear();
     oled.setScale(1);
-    oled.setCursor(3, 0);
+    oled.setCursor(2, 0);
     oled.print(F("О СИСТЕМЕ"));
     oled.line(0, 10, 127, 10);
     oled.setCursor(0, 2);
-    oled.print(F("Версия: "));
+    oled.print(F("v"));
     oled.print(FIRMWARE_VERSION);
     oled.setCursor(0, 3);
-    oled.print(F("Автор: kelll31"));
+    oled.print(F("kelll31"));
     oled.setCursor(0, 4);
-    oled.print(F("Работа: "));
+    oled.print(F("Работа:"));
     if (workTime >= 3600) {
       oled.print(workTime / 3600);
-      oled.print(F("ч "));
+      oled.print(F("ч"));
     }
     oled.print((workTime % 3600) / 60);
     oled.print(F("м"));
     oled.setCursor(0, 5);
-    oled.print(F("Перекл: "));
+    oled.print(F("Перекл:"));
     oled.print(switchCount);
     oled.print(F("/ч"));
     oled.setCursor(0, 6);
-    oled.print(F("Всего: "));
+    oled.print(F("Всего:"));
     oled.print(totalSwitches);
     oled.setCursor(0, 7);
     oled.print(F("ДЛ-выход"));
@@ -294,29 +305,27 @@ public:
                              float tempCal, float humCal, bool editingTemp) {
     oled.clear();
     oled.setScale(1);
-    oled.setCursor(2, 0);
+    oled.setCursor(1, 0);
     oled.print(F("КАЛИБРОВКА"));
     oled.line(0, 10, 127, 10);
     oled.setCursor(0, 2);
-    oled.print(F("Т:"));
+    oled.print(F("T:"));
     oled.print(currentTemp, 1);
-    oled.print(F("C В:"));
+    oled.print(F("C H:"));
     oled.print(currentHum, 1);
     oled.print(F("%"));
     oled.setCursor(0, 4);
-    if (editingTemp) oled.print(F("> "));
-    oled.print(F("Корр.Т: "));
+    if (editingTemp) oled.print(F(">>"));
+    oled.print(F("КорT:"));
     if (tempCal >= 0) oled.print(F("+"));
     oled.print(tempCal, 1);
-    oled.print(F("C"));
     oled.setCursor(0, 5);
-    if (!editingTemp) oled.print(F("> "));
-    oled.print(F("Корр.В: "));
+    if (!editingTemp) oled.print(F(">>"));
+    oled.print(F("КорH:"));
     if (humCal >= 0) oled.print(F("+"));
     oled.print(humCal, 1);
-    oled.print(F("%"));
     oled.setCursor(0, 7);
-    oled.print(F("КН-след ДЛ-OK"));
+    oled.print(F("КН=след ДЛ=OK"));
     oled.update();
   }
 
