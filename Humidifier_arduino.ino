@@ -1,13 +1,17 @@
 /*
- * АВТОМАТИЧЕСКИЙ УВЛАЖНИТЕЛЬ v1.7
+ * АВТОМАТИЧЕСКИЙ УВЛАЖНИТЕЛЬ v1.7.2
  * 
- * Новое:
- * - Датчик уровня воды (резистивный A0)
- * - Детектор открытого окна (программный)
- * - Расширенная статистика (24ч в EEPROM)
+ * v1.7.2:
+ * - 2 режима главного экрана: ДАННЫЕ и ГРАФИК
+ * - Переключение вращением энкодера
+ * 
+ * v1.7:
+ * - Датчик уровня воды (A0)
+ * - Детектор открытого окна
+ * - Расширенная статистика
  * - Адаптивное обучение
  * 
- * Автор: kelll31 | 2026-02-11
+ * Автор: kelll31 | 2026-02-12
  */
 
 #include "config.h"
@@ -42,7 +46,6 @@ void setup() {
   
   analytics.begin();
   
-  // Проверка датчика воды при старте
   if (!analytics.isWaterSensorPresent()) {
     display.showWaterSensorError();
   }
@@ -120,6 +123,12 @@ void loop() {
     menu.tick();
     menu.draw();
   } else {
+    // На главном экране - вращение переключает режим
+    if (encoder.isRight() || encoder.isLeft()) {
+      display.toggleMode();
+      dataUpdated = true;
+    }
+    
     if (dataUpdated) {
       display.drawMainScreen(
         sensor.getTemperature(),
