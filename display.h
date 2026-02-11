@@ -1,6 +1,6 @@
 /*
- * МОДУЛЬ ДИСПЛЕЯ OLED 128x64 v1.7.2
- * 2 режима главного экрана: ДАННЫЕ и ГРАФИК (переключение энкодером)
+ * МОДУЛЬ ДИСПЛЕЯ OLED 128x64 v1.7.3
+ * 2 режима главного экрана: ДАННЫЕ и ГРАФИК
  */
 
 #ifndef DISPLAY_H
@@ -15,8 +15,8 @@ GyverOLED<SSD1306_128x64, OLED_BUFFER> oled;
 #define GRAPH_POINTS 32
 
 enum DisplayMode {
-  MODE_DATA = 0,   // Режим данных без графика
-  MODE_GRAPH = 1   // Режим графика на весь экран
+  MODE_DATA = 0,
+  MODE_GRAPH = 1
 };
 
 class Display {
@@ -69,7 +69,6 @@ public:
     return currentBrightness;
   }
   
-  // Переключение режима
   void toggleMode() {
     currentMode = (currentMode == MODE_DATA) ? MODE_GRAPH : MODE_DATA;
     firstDraw = true;
@@ -90,21 +89,6 @@ public:
     oled.print(FIRMWARE_VERSION);
     oled.update();
   }
-  
-  void showWaterSensorError() {
-    oled.clear();
-    oled.setScale(1);
-    oled.setCursor(10, 2);
-    oled.print(F("Датчик воды"));
-    oled.setCursor(5, 3);
-    oled.print(F("не обнаружен"));
-    oled.setCursor(0, 5);
-    oled.print(F("Проверьте A0"));
-    oled.setCursor(0, 7);
-    oled.print(F("Работа без датчика"));
-    oled.update();
-    delay(3000);
-  }
 
   void addGraphPoint(float humidity, bool running) {
     uint8_t val = (uint8_t)constrain(humidity, 0, 100);
@@ -121,7 +105,6 @@ public:
   void drawFullGraph() {
     uint8_t cnt = gFull ? GRAPH_POINTS : gIdx;
     
-    // Рамка на весь экран
     oled.line(0, 0, 127, 0);
     oled.line(0, 63, 127, 63);
     oled.line(0, 0, 0, 63);
@@ -143,7 +126,6 @@ public:
     }
     if (hi == lo) hi = lo + 1;
 
-    // Метки
     oled.setScale(1);
     oled.setCursor(2, 0);
     oled.print(hi);
@@ -176,7 +158,6 @@ public:
     }
   }
 
-  // Главный экран с выбором режима
   void drawMainScreen(float temp, float hum, uint8_t targetHum,
                       bool running, unsigned long workTime, bool sensorOK,
                       bool waterLow = false, bool windowOpen = false) {
@@ -210,10 +191,8 @@ public:
     }
 
     if (currentMode == MODE_DATA) {
-      // РЕЖИМ ДАННЫХ (без графика)
       oled.setScale(2);
       
-      // Температура
       oled.setCursor(0, 0);
       oled.print(F("Т:"));
       if (temp >= -40 && temp <= 80) {
@@ -223,7 +202,6 @@ public:
       }
       oled.print(F("C"));
       
-      // Влажность
       oled.setCursor(0, 2);
       oled.print(F("В:"));
       if (hum >= 0 && hum <= 100) {
@@ -233,7 +211,6 @@ public:
       }
       oled.print(F("%"));
       
-      // Уставка
       oled.setCursor(0, 4);
       oled.print(F("Уст:"));
       oled.print(targetHum);
@@ -241,7 +218,6 @@ public:
       
       oled.setScale(1);
       
-      // Статус
       oled.setCursor(0, 6);
       oled.print(F("Статус: "));
       if (waterLow) {
@@ -254,7 +230,6 @@ public:
         oled.print(F("ОЖИДАНИЕ"));
       }
       
-      // Время работы
       oled.setCursor(0, 7);
       oled.print(F("Работа:"));
       if (workTime >= 3600) {
@@ -265,7 +240,6 @@ public:
       oled.print(F("м"));
       
     } else {
-      // РЕЖИМ ГРАФИКА (на весь экран)
       oled.setScale(1);
       drawFullGraph();
     }
@@ -345,10 +319,6 @@ public:
     oled.print(F("КН-след ДЛ-OK"));
     oled.update();
   }
-
-  // ======================================
-  // Методы-обёртки для menu.h
-  // ======================================
 
   void clear() {
     oled.clear();
