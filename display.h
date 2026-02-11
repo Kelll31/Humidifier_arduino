@@ -15,7 +15,7 @@ GyverOLED<SSD1306_128x64, OLED_BUFFER> oled;
 
 // График влажности - уменьшено до 32 точек для экономии RAM
 #define GRAPH_POINTS 32  // 32 точки = ~1 минута истории
-#define GRAPH_HEIGHT 20
+#define GRAPH_HEIGHT 48  // увеличена высота графика
 
 class Display {
 private:
@@ -99,7 +99,7 @@ public:
     if (pointsToShow < 2) {
       oled.rect(x, y, x + width - 1, y + height - 1);
       oled.setScale(1);
-      oled.setCursor(x + 25, y + 1);
+      oled.setCursor(x + 25, y + height / 2);
       oled.print(F("Накопление..."));
       return;
     }
@@ -171,14 +171,6 @@ public:
     if (changed) {
       oled.clear();
 
-      // Заголовок
-      oled.setScale(1);
-      oled.setCursor(25, 0);
-      oled.print(F("УВЛАЖНИТЕЛЬ"));
-
-      // Разделительная линия
-      oled.line(0, 12, 127, 12);
-
       // Проверка ошибки датчика
       if (!sensorOK) {
         oled.setScale(2);
@@ -194,34 +186,26 @@ public:
         return;
       }
 
-      // Температура
-      oled.setCursor(0, 2);
-      oled.print(F("Темп:"));
+      // Температура и влажность в одну строку
       oled.setScale(2);
-      oled.setCursor(40, 2);
+      oled.setCursor(0, 0);
       if (temp >= -40 && temp <= 80) {
         oled.print(temp, 1);
       } else {
         oled.print(F("--"));
       }
-      oled.setScale(1);
       oled.print(F("C"));
-
-      // Влажность
-      oled.setCursor(0, 4);
-      oled.print(F("Влажн:"));
-      oled.setScale(2);
-      oled.setCursor(40, 4);
+      
+      oled.setCursor(70, 0);
       if (hum >= 0 && hum <= 100) {
         oled.print(hum, 1);
       } else {
         oled.print(F("--"));
       }
-      oled.setScale(1);
       oled.print(F("%"));
 
-      // График влажности внизу
-      drawHumidityGraph(0, 44, 128, GRAPH_HEIGHT);
+      // График влажности внизу (занимает остальную часть экрана)
+      drawHumidityGraph(0, 16, 128, GRAPH_HEIGHT);
 
       oled.update();
 
