@@ -12,7 +12,7 @@
  * 
  * Автор: kelll31
  * Дата: 2026-02-11
- * Версия: 1.5 - UI Improvements
+ * Версия: 1.6 - Humidity Graph
  */
 
 #include "config.h"
@@ -34,7 +34,7 @@ Storage storage;
 // Переменные состояния
 unsigned long lastUpdateTime = 0;
 unsigned long lastSaveTime = 0;
-bool dataUpdated = false;  // Флаг обновления данных для экрана
+bool dataUpdated = false;
 
 void setup() {
   // Загрузка настроек из EEPROM
@@ -47,19 +47,19 @@ void setup() {
 
   // Инициализация датчика
   sensor.begin();
-  sensor.setStorage(&storage); // Связь с storage для калибровки
+  sensor.setStorage(&storage);
 
   // Инициализация энкодера
   encoder.begin();
 
   // Инициализация увлажнителя
   humidifier.begin();
-  humidifier.setStorage(&storage); // Связь с storage для учета переключений
+  humidifier.setStorage(&storage);
 
   // Инициализация меню
   menu.begin(&display, &encoder, &storage, &sensor, &humidifier);
 
-  // Включение watchdog timer (защита от зависания)
+  // Включение watchdog timer
   wdt_enable(WDTO_4S);
 }
 
@@ -70,7 +70,7 @@ void loop() {
   // Обработка энкодера
   encoder.tick();
 
-  // Обработка storage (защита EEPROM)
+  // Обработка storage
   storage.tick();
 
   // Обновление данных с датчика каждые 2 секунды
@@ -80,6 +80,10 @@ void loop() {
     // Чтение данных с DHT22
     if (sensor.update()) {
       float hum = sensor.getHumidity();
+      bool running = humidifier.isRunning();
+
+      // Добавляем точку на график
+      display.addGraphPoint(hum, running);
 
       // Управление увлажнителем
       humidifier.control(hum, storage.getMinHumidity(), storage.getMaxHumidity(), sensor.isOK());
@@ -89,13 +93,12 @@ void loop() {
         storage.incrementWorkTime(UPDATE_INTERVAL / 1000);
       }
 
-      // Устанавливаем флаг, что данные обновлены
       dataUpdated = true;
 
     } else {
       // Мигание LED2 при ошибке
       humidifier.blinkError();
-      dataUpdated = true; // Обновить экран для отображения ошибки
+      dataUpdated = true;
     }
   }
 
@@ -105,7 +108,7 @@ void loop() {
     menu.tick();
     menu.draw();
   } else {
-    // Главный экран - обновляем только при обновлении данных с датчика
+    // Главный экран
     if (dataUpdated) {
       display.drawMainScreen(
         sensor.getTemperature(),
@@ -116,16 +119,6 @@ void loop() {
         sensor.isOK()
       );
       dataUpdated = false;
-    } else {
-      // Даже если данные не обновлены, вызываем для анимации
-      display.drawMainScreen(
-        sensor.getTemperature(),
-        sensor.getHumidity(),
-        storage.getMaxHumidity(),
-        humidifier.isRunning(),
-        storage.getWorkTime(),
-        sensor.isOK()
-      );
     }
     
     // Длинное нажатие на главном экране - вход в меню
