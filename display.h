@@ -70,6 +70,13 @@ public:
 
   void drawGraph() {
     uint8_t cnt = gFull ? GRAPH_POINTS : gIdx;
+    
+    // Рамка графика из 4 линий (всегда рисуем)
+    oled.line(0, GRAPH_Y, 127, GRAPH_Y);              // верх
+    oled.line(0, 63, 127, 63);                        // низ
+    oled.line(0, GRAPH_Y, 0, 63);                     // лево
+    oled.line(127, GRAPH_Y, 127, 63);                 // право
+    
     if (cnt == 0) return;
 
     // Находим min/max
@@ -88,58 +95,42 @@ public:
     }
     if (hi == lo) hi = lo + 1;
 
-    // Координаты области графика
-    const uint8_t gx = 0;
-    const uint8_t gy = GRAPH_Y;
-    const uint8_t gw = 128;
-    const uint8_t gh = GRAPH_H;
-
-    // Рамка из линий (не заливкой!)
-    oled.line(gx, gy, gx + gw - 1, gy);                // верх
-    oled.line(gx, gy + gh - 1, gx + gw - 1, gy + gh - 1); // низ
-    oled.line(gx, gy, gx, gy + gh - 1);                // лево
-    oled.line(gx + gw - 1, gy, gx + gw - 1, gy + gh - 1); // право
-
     // Мин/макс метки
     oled.setScale(1);
-    oled.setCursor(2, (gy + 2) / 8);
+    oled.setCursor(2, 2);    // строка 2 = y16
     oled.print(hi);
-    oled.setCursor(2, (gy + gh - 10) / 8);
+    oled.setCursor(2, 6);    // строка 6 = y48
     oled.print(lo);
 
-    // Рисуем линию графика
-    // Новые данные справа, старые слева
-    // График прижат к правому краю
+    // Рисуем линию графика (новые данные справа)
     int16_t prevPx = -1, prevPy = -1;
 
     for (uint8_t i = 0; i < cnt; i++) {
-      // i=0 старейшая, i=cnt-1 новейшая
       uint8_t dataIdx = gFull ? ((gIdx + i) % GRAPH_POINTS) : i;
       uint8_t v = humGraph[dataIdx];
 
       // X: прижать к правому краю
-      // самая новая точка (i=cnt-1) -> x = gx+gw-2
-      // самая старая (i=0) -> x = gx+gw-2 - (cnt-1)*step
       uint8_t px;
       if (cnt == 1) {
-        px = gx + gw - 2;
+        px = 126;
       } else {
-        px = gx + gw - 2 - (uint16_t)(cnt - 1 - i) * (gw - 4) / (cnt - 1);
+        px = 126 - (uint16_t)(cnt - 1 - i) * 124 / (cnt - 1);
       }
 
-      // Y: мапим значение в пиксели
-      uint8_t py = gy + gh - 2 - (uint16_t)(v - lo) * (gh - 4) / (hi - lo);
-      py = constrain(py, gy + 2, gy + gh - 3);
+      // Y: мапим значение в пиксели (GRAPH_Y+2 .. 61)
+      uint8_t py = 61 - (uint16_t)(v - lo) * 43 / (hi - lo);
+      if (py < GRAPH_Y + 2) py = GRAPH_Y + 2;
+      if (py > 61) py = 61;
 
       if (prevPx >= 0) {
         oled.line(prevPx, prevPy, px, py);
       }
       oled.dot(px, py);
 
-      // Отметки включения увлажнителя (точки внизу)
+      // Отметки включения увлажнителя
       if (humState & ((uint32_t)1 << dataIdx)) {
-        oled.dot(px, gy + gh - 3);
-        oled.dot(px, gy + gh - 4);
+        oled.dot(px, 61);
+        oled.dot(px, 60);
       }
 
       prevPx = px;
@@ -147,6 +138,7 @@ public:
     }
   }
 
+  // Главный экран
   void drawMainScreen(float temp, float hum, uint8_t targetHum,
                       bool running, unsigned long workTime, bool sensorOK) {
     bool changed = false;
@@ -157,55 +149,57 @@ public:
     if (firstDraw || running != lastRunning) changed = true;
     if (firstDraw || (workTime / 60) != (lastWorkTime / 60)) changed = true;
 
-    if (changed) {
-      oled.clear();
+    if (!changed) return;
 
-      if (!sensorOK) {
-        oled.setScale(2);
-        oled.setCursor(15, 3);
-        oled.print(F("ОШИБКА"));
-        oled.setScale(1);
-        oled.setCursor(20, 6);
-        oled.print(F("Датчик DHT22"));
-        oled.update();
-        lastSensorOK = sensorOK;
-        firstDraw = false;
-        return;
-      }
+    oled.clear();
 
-      // Верхняя строка: температура и влажность
+    if (!sensorOK) {
       oled.setScale(2);
-      oled.setCursor(0, 0);
-      if (temp >= -40 && temp <= 80) {
-        oled.print(temp, 1);
-      } else {
-        oled.print(F("--"));
-      }
-      oled.print(F("C"));
-
-      oled.setCursor(70, 0);
-      if (hum >= 0 && hum <= 100) {
-        oled.print(hum, 1);
-      } else {
-        oled.print(F("--"));
-      }
-      oled.print(F("%"));
-
-      // График
-      drawGraph();
-
+      oled.setCursor(15, 3);
+      oled.print(F("ОШИБКА"));
+      oled.setScale(1);
+      oled.setCursor(20, 6);
+      oled.print(F("Датчик DHT22"));
       oled.update();
-
-      lastTemp = temp;
-      lastHum = hum;
-      lastTargetHum = targetHum;
-      lastRunning = running;
-      lastWorkTime = workTime;
       lastSensorOK = sensorOK;
       firstDraw = false;
+      return;
     }
+
+    // Верхняя строка: температура и влажность
+    oled.setScale(2);
+    oled.setCursorXY(0, 0);
+    if (temp >= -40 && temp <= 80) {
+      oled.print(temp, 1);
+    } else {
+      oled.print(F("--"));
+    }
+    oled.print(F("C"));
+
+    oled.setCursorXY(70, 0);
+    if (hum >= 0 && hum <= 100) {
+      oled.print(hum, 1);
+    } else {
+      oled.print(F("--"));
+    }
+    oled.print(F("%"));
+
+    // График
+    oled.setScale(1);
+    drawGraph();
+
+    oled.update();
+
+    lastTemp = temp;
+    lastHum = hum;
+    lastTargetHum = targetHum;
+    lastRunning = running;
+    lastWorkTime = workTime;
+    lastSensorOK = sensorOK;
+    firstDraw = false;
   }
 
+  // Экран "О системе"
   void drawAboutScreen(unsigned long workTime, uint8_t switchCount,
                        unsigned long totalSwitches) {
     oled.clear();
@@ -238,6 +232,7 @@ public:
     oled.update();
   }
 
+  // Экран калибровки
   void drawCalibrationScreen(float currentTemp, float currentHum,
                              float tempCal, float humCal, bool editingTemp) {
     oled.clear();
@@ -268,23 +263,45 @@ public:
     oled.update();
   }
 
-  void clear() { oled.clear(); oled.update(); }
-  void update() { oled.update(); }
-  void setCursor(uint8_t x, uint8_t y) { oled.setCursor(x, y); }
+  // ======================================
+  // Методы-обёртки для menu.h
+  // ======================================
+
+  void clear() {
+    oled.clear();
+    // НЕ вызываем oled.update() здесь!
+    // Меню сначала рисует, потом вызывает update()
+  }
+
+  void update() {
+    oled.update();
+  }
+
+  void setCursor(uint8_t x, uint8_t y) {
+    oled.setCursor(x, y);
+  }
+
   void print(const char* t) { oled.print(t); }
   void print(const __FlashStringHelper* t) { oled.print(t); }
   void print(int v) { oled.print(v); }
   void print(float v, int d = 1) { oled.print(v, d); }
-  void setScale(uint8_t s) { oled.setScale(s); }
-  void drawLine(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1) { oled.line(x0, y0, x1, y1); }
+
+  void setScale(uint8_t s) {
+    oled.setScale(s);
+  }
+
+  void drawLine(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1) {
+    oled.line(x0, y0, x1, y1);
+  }
 
   void drawRect(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, bool fill = false) {
-    if (fill) oled.rect(x0, y0, x1, y1, OLED_FILL);
-    else {
-      oled.line(x0, y0, x1, y0);
-      oled.line(x0, y1, x1, y1);
-      oled.line(x0, y0, x0, y1);
-      oled.line(x1, y0, x1, y1);
+    if (fill) {
+      oled.rect(x0, y0, x1, y1, OLED_FILL);
+    } else {
+      oled.line(x0, y0, x1, y0);  // верх
+      oled.line(x0, y1, x1, y1);  // низ
+      oled.line(x0, y0, x0, y1);  // лево
+      oled.line(x1, y0, x1, y1);  // право
     }
   }
 
