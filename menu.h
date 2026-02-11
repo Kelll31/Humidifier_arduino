@@ -1,7 +1,7 @@
 /*
  * МОДУЛЬ МЕНЮ
  * Навигация и настройка параметров
- * ИСПРАВЛЕНО v2: используем setCursorXY с пиксельными координатами
+ * ИСПРАВЛЕНО: на основе рабочей версии 1.6
  */
 
 #ifndef MENU_H
@@ -16,8 +16,7 @@
 #include "humidifier.h"
 
 // Пункты меню
-enum MenuItem
-{
+enum MenuItem {
   MENU_MIN_HUMIDITY = 0,
   MENU_MAX_HUMIDITY = 1,
   MENU_HYSTERESIS = 2,
@@ -28,20 +27,18 @@ enum MenuItem
 };
 
 // Режимы калибровки
-enum CalibrationMode
-{
+enum CalibrationMode {
   CAL_TEMP = 0,
   CAL_HUM = 1
 };
 
-class Menu
-{
+class Menu {
 private:
-  Display *display;
-  EncoderModule *encoder;
-  Storage *storage;
-  Sensor *sensor;
-  Humidifier *humidifier;
+  Display* display;
+  EncoderModule* encoder;
+  Storage* storage;
+  Sensor* sensor;
+  Humidifier* humidifier;
 
   bool active;
   uint8_t currentItem;
@@ -61,14 +58,15 @@ private:
   // Флаг необходимости перерисовки экрана меню
   bool needRedraw;
 
-  const char *menuItems[7] = {
-      "Мин.влажность",
-      "Макс.влажность",
-      "Гистерезис",
-      "Калибровка",
-      "Сброс статистики",
-      "О системе",
-      "Выход"};
+  const char* menuItems[7] = {
+    "Мин.влажность",
+    "Макс.влажность",
+    "Гистерезис",
+    "Калибровка",
+    "Сброс статистики",
+    "О системе",
+    "Выход"
+  };
 
 public:
   Menu() : display(nullptr),
@@ -89,8 +87,7 @@ public:
            needRedraw(true) {}
 
   // Инициализация
-  void begin(Display *disp, EncoderModule *enc, Storage *stor, Sensor *sens, Humidifier *hum)
-  {
+  void begin(Display* disp, EncoderModule* enc, Storage* stor, Sensor* sens, Humidifier* hum) {
     display = disp;
     encoder = enc;
     storage = stor;
@@ -99,8 +96,7 @@ public:
   }
 
   // Открыть меню
-  void open()
-  {
+  void open() {
     active = true;
     currentItem = 0;
     editMode = false;
@@ -112,8 +108,7 @@ public:
   }
 
   // Закрыть меню
-  void close()
-  {
+  void close() {
     active = false;
     editMode = false;
     calibrationMode = false;
@@ -124,107 +119,84 @@ public:
   }
 
   // Проверка активности меню
-  bool isActive() const
-  {
+  bool isActive() const {
     return active;
   }
 
   // Обработка меню
-  void tick()
-  {
-    if (!active)
-      return;
+  void tick() {
+    if (!active) return;
 
     // Автовыход из меню при бездействии
-    if (millis() - lastActivityTime > SCREEN_TIMEOUT)
-    {
+    if (millis() - lastActivityTime > SCREEN_TIMEOUT) {
       close();
       return;
     }
 
     // Обработка режимов
-    if (calibrationMode)
-    {
+    if (calibrationMode) {
       handleCalibrationMode();
-    }
-    else if (aboutMode)
-    {
+    } else if (aboutMode) {
       handleAboutMode();
-    }
-    else if (editMode)
-    {
+    } else if (editMode) {
       handleEditMode();
-    }
-    else
-    {
+    } else {
       handleNavigationMode();
     }
   }
 
   // Режим навигации
-  void handleNavigationMode()
-  {
+  void handleNavigationMode() {
     // Обработка вращения энкодера
     int8_t delta = encoder->getDelta();
-    if (delta != 0)
-    {
+    if (delta != 0) {
       currentItem += delta;
 
       // Циклическая навигация
-      if (currentItem < 0)
-        currentItem = MENU_EXIT;
-      if (currentItem > MENU_EXIT)
-        currentItem = 0;
+      if (currentItem < 0) currentItem = MENU_EXIT;
+      if (currentItem > MENU_EXIT) currentItem = 0;
 
       lastActivityTime = millis();
       needRedraw = true;
     }
 
     // Короткое нажатие - выбор пункта
-    if (encoder->isClick())
-    {
+    if (encoder->isClick()) {
       selectMenuItem();
       lastActivityTime = millis();
       needRedraw = true;
     }
 
     // Длинное нажатие - выход из меню
-    if (encoder->isLongPress())
-    {
+    if (encoder->isLongPress()) {
       encoder->clearLongPress();
       close();
     }
   }
 
   // Режим редактирования
-  void handleEditMode()
-  {
+  void handleEditMode() {
     int8_t delta = encoder->getDelta();
 
-    if (delta != 0)
-    {
+    if (delta != 0) {
       // Быстрое вращение - изменение по 5
-      if (encoder->isFastRotate())
-      {
+      if (encoder->isFastRotate()) {
         editValue += delta * 5;
-      }
-      else
-      {
+      } else {
         editValue += delta;
       }
 
       // Ограничение значений
-      switch (currentItem)
-      {
-      case MENU_MIN_HUMIDITY:
-        editValue = constrain(editValue, 20, 80);
-        break;
-      case MENU_MAX_HUMIDITY:
-        editValue = constrain(editValue, 30, 90);
-        break;
-      case MENU_HYSTERESIS:
-        editValue = constrain(editValue, 1, 20);
-        break;
+      switch (currentItem) {
+        case MENU_MIN_HUMIDITY:
+          editValue = constrain(editValue, 20, 80);
+          break;
+        case MENU_MAX_HUMIDITY:
+          editValue = constrain(editValue, 30, 90);
+          break;
+        case MENU_HYSTERESIS:
+          editValue = constrain(editValue, 1, 20);
+          break;
       }
 
       lastActivityTime = millis();
@@ -232,8 +204,7 @@ public:
     }
 
     // Короткое нажатие - сохранить
-    if (encoder->isClick())
-    {
+    if (encoder->isClick()) {
       saveEditValue();
       editMode = false;
       encoder->resetPosition();
@@ -242,8 +213,7 @@ public:
     }
 
     // Длинное нажатие - отмена
-    if (encoder->isLongPress())
-    {
+    if (encoder->isLongPress()) {
       encoder->clearLongPress();
       editMode = false;
       encoder->resetPosition();
@@ -253,25 +223,19 @@ public:
   }
 
   // Режим калибровки
-  void handleCalibrationMode()
-  {
+  void handleCalibrationMode() {
     int8_t delta = encoder->getDelta();
 
-    if (delta != 0)
-    {
+    if (delta != 0) {
       float step = 0.1;
-      if (encoder->isFastRotate())
-      {
+      if (encoder->isFastRotate()) {
         step = 0.5;
       }
 
-      if (calibrationStep == CAL_TEMP)
-      {
+      if (calibrationStep == CAL_TEMP) {
         tempCalValue += delta * step;
         tempCalValue = constrain(tempCalValue, -10.0, 10.0);
-      }
-      else
-      {
+      } else {
         humCalValue += delta * step;
         humCalValue = constrain(humCalValue, -20.0, 20.0);
       }
@@ -281,8 +245,7 @@ public:
     }
 
     // Короткое нажатие - переключение между Т и В
-    if (encoder->isClick())
-    {
+    if (encoder->isClick()) {
       calibrationStep = (calibrationStep == CAL_TEMP) ? CAL_HUM : CAL_TEMP;
       encoder->resetPosition();
       lastActivityTime = millis();
@@ -290,8 +253,7 @@ public:
     }
 
     // Длинное нажатие - сохранить и выйти
-    if (encoder->isLongPress())
-    {
+    if (encoder->isLongPress()) {
       encoder->clearLongPress();
       storage->setTempCalibration(tempCalValue);
       storage->setHumCalibration(humCalValue);
@@ -304,11 +266,9 @@ public:
   }
 
   // Режим "О системе"
-  void handleAboutMode()
-  {
+  void handleAboutMode() {
     // Длинное нажатие - выход
-    if (encoder->isLongPress())
-    {
+    if (encoder->isLongPress()) {
       encoder->clearLongPress();
       aboutMode = false;
       encoder->resetPosition();
@@ -318,188 +278,175 @@ public:
   }
 
   // Выбор пункта меню
-  void selectMenuItem()
-  {
-    switch (currentItem)
-    {
-    case MENU_MIN_HUMIDITY:
-      editValue = storage->getMinHumidity();
-      editMode = true;
-      encoder->resetPosition();
-      break;
+  void selectMenuItem() {
+    switch (currentItem) {
+      case MENU_MIN_HUMIDITY:
+        editValue = storage->getMinHumidity();
+        editMode = true;
+        encoder->resetPosition();
+        break;
 
-    case MENU_MAX_HUMIDITY:
-      editValue = storage->getMaxHumidity();
-      editMode = true;
-      encoder->resetPosition();
-      break;
+      case MENU_MAX_HUMIDITY:
+        editValue = storage->getMaxHumidity();
+        editMode = true;
+        encoder->resetPosition();
+        break;
 
-    case MENU_HYSTERESIS:
-      editValue = storage->getHysteresis();
-      editMode = true;
-      encoder->resetPosition();
-      break;
+      case MENU_HYSTERESIS:
+        editValue = storage->getHysteresis();
+        editMode = true;
+        encoder->resetPosition();
+        break;
 
-    case MENU_CALIBRATE:
-      // Вход в режим калибровки
-      calibrationMode = true;
-      calibrationStep = CAL_TEMP;
-      tempCalValue = storage->getTempCalibration();
-      humCalValue = storage->getHumCalibration();
-      encoder->resetPosition();
-      break;
+      case MENU_CALIBRATE:
+        // Вход в режим калибровки
+        calibrationMode = true;
+        calibrationStep = CAL_TEMP;
+        tempCalValue = storage->getTempCalibration();
+        humCalValue = storage->getHumCalibration();
+        encoder->resetPosition();
+        break;
 
-    case MENU_RESET_STATS:
-      storage->resetWorkTime();
-      storage->resetSwitchCount();
-      storage->save();
-      break;
+      case MENU_RESET_STATS:
+        storage->resetWorkTime();
+        storage->resetSwitchCount();
+        storage->save();
+        break;
 
-    case MENU_ABOUT:
-      // Показать экран "О системе"
-      aboutMode = true;
-      break;
+      case MENU_ABOUT:
+        // Показать экран "О системе"
+        aboutMode = true;
+        break;
 
-    case MENU_EXIT:
-      close();
-      break;
+      case MENU_EXIT:
+        close();
+        break;
     }
   }
 
   // Сохранение отредактированного значения
-  void saveEditValue()
-  {
-    switch (currentItem)
-    {
-    case MENU_MIN_HUMIDITY:
-      storage->setMinHumidity(editValue);
-      break;
+  void saveEditValue() {
+    switch (currentItem) {
+      case MENU_MIN_HUMIDITY:
+        storage->setMinHumidity(editValue);
+        break;
 
-    case MENU_MAX_HUMIDITY:
-      storage->setMaxHumidity(editValue);
-      break;
+      case MENU_MAX_HUMIDITY:
+        storage->setMaxHumidity(editValue);
+        break;
 
-    case MENU_HYSTERESIS:
-      storage->setHysteresis(editValue);
-      break;
+      case MENU_HYSTERESIS:
+        storage->setHysteresis(editValue);
+        break;
     }
   }
 
   // Отрисовка меню
-  void draw()
-  {
-    if (!active)
-      return;
+  void draw() {
+    if (!active) return;
 
     // Ничего не делаем, если экран не требует перерисовки
-    if (!needRedraw)
-      return;
+    if (!needRedraw) return;
     needRedraw = false;
 
-    if (calibrationMode)
-    {
+    if (calibrationMode) {
       display->drawCalibrationScreen(
-          sensor->getTemperature(),
-          sensor->getHumidity(),
-          tempCalValue,
-          humCalValue,
-          (calibrationStep == CAL_TEMP));
+        sensor->getTemperature(),
+        sensor->getHumidity(),
+        tempCalValue,
+        humCalValue,
+        (calibrationStep == CAL_TEMP)
+      );
       return;
     }
-
-    if (aboutMode)
-    {
+    
+    if (aboutMode) {
       display->drawAboutScreen(
-          storage->getWorkTime(),
-          humidifier->getSwitchCount(),
-          storage->getTotalSwitches());
+        storage->getWorkTime(),
+        humidifier->getSwitchCount(),
+        storage->getTotalSwitches()
+      );
       return;
     }
-
-    if (editMode)
-    {
+    
+    if (editMode) {
       drawEditScreen();
       return;
     }
-
+    
     drawMenuScreen();
   }
 
-  // Отрисовка экрана меню - ИСПРАВЛЕНО: используем setCursorXY
-  void drawMenuScreen()
-  {
+  // Отрисовка экрана меню - КАК В ВЕРСИИ 1.6 (РАБОТАЕТ!)
+  void drawMenuScreen() {
     display->clear();
-
-    // Заголовок - используем setCursorXY с пиксельными координатами
+    
+    // Заголовок
     display->setScale(1);
-    display->setCursorXY(30, 0);  // x=30 пикселей, y=0 пикселей
+    display->setCursor(5, 0);  // СТРОКА 0 (символьные координаты!)
     display->print(F("МЕНЮ"));
     display->drawLine(0, 10, 127, 10);
 
     // Отображаем 5 пунктов: текущий, 2 предыдущих, 2 следующих
     int8_t startItem = currentItem - 2;
-    if (startItem < 0)
-      startItem = 0;
-    if (startItem > MENU_EXIT - 4)
-      startItem = MENU_EXIT - 4;
-    if (startItem < 0)
-      startItem = 0;
+    if (startItem < 0) startItem = 0;
+    if (startItem > MENU_EXIT - 4) startItem = MENU_EXIT - 4;
+    if (startItem < 0) startItem = 0;
 
-    for (uint8_t i = 0; i < 5; i++)
-    {
+    for (uint8_t i = 0; i < 5; i++) {
       uint8_t itemIndex = startItem + i;
-      if (itemIndex > MENU_EXIT)
-        break;
+      if (itemIndex > MENU_EXIT) break;
 
-      uint8_t yPixel = 16 + (i * 10);  // Пиксельные координаты: 16, 26, 36, 46, 56
+      uint8_t y = 2 + i;  // СТРОКИ: 2, 3, 4, 5, 6
 
       // Стрелка "> " для текущего пункта
-      if (itemIndex == currentItem)
-      {
-        display->setCursorXY(0, yPixel);
+      if (itemIndex == currentItem) {
+        display->setCursor(0, y);
         display->print(F(">"));
       }
 
       // Текст пункта
-      display->setCursorXY(12, yPixel);  // x=12 пикселей (отступ от стрелки)
+      display->setCursor(2, y);  // Отступ 2 символа
       display->print(menuItems[itemIndex]);
     }
 
+    // Подсказка
+    display->setCursor(0, 7);  // СТРОКА 7
+    display->print(F("ДН-выб ДЛ-выход"));
+    
     display->update();
   }
 
-  // Отрисовка экрана редактирования - ИСПРАВЛЕНО: используем setCursorXY
-  void drawEditScreen()
-  {
+  // Отрисовка экрана редактирования - КАК В ВЕРСИИ 1.6 (РАБОТАЕТ!)
+  void drawEditScreen() {
     display->clear();
-
+    
     display->setScale(1);
-    display->setCursorXY(15, 0);  // x=15 пикселей, y=0 пикселей
+    display->setCursor(2, 0);  // СТРОКА 0
     display->print(F("НАСТРОЙКА"));
     display->drawLine(0, 10, 127, 10);
 
     // Название параметра
-    display->setCursorXY(0, 16);  // y=16 пикселей
+    display->setCursor(0, 2);  // СТРОКА 2
     display->print(menuItems[currentItem]);
 
     // Значение - большой шрифт
     display->setScale(3);
-    display->setCursorXY(30, 26);  // y=26 пикселей, центрируем
+    display->setCursor(4, 3);  // СТРОКА 3
     display->print(editValue);
 
     display->setScale(1);
 
     // Единицы измерения
-    if (currentItem <= MENU_HYSTERESIS)
-    {
-      display->setCursorXY(80, 40);  // y=40 пикселей
+    if (currentItem <= MENU_HYSTERESIS) {
+      display->setCursor(12, 5);  // СТРОКА 5
       display->print(F("%"));
     }
 
     // Подсказка
-    display->setCursorXY(0, 56);  // y=56 пикселей (последняя строка)
+    display->setCursor(0, 7);  // СТРОКА 7
     display->print(F("ДН-OK ДЛ-отмена"));
-
+    
     display->update();
   }
 };
