@@ -75,8 +75,8 @@ void loop() {
   encoder.tick();
   
   // Отслеживание активности энкодера для управления яркостью
-  // Проверяем только вращение и короткие нажатия (не длинные)
-  if (encoder.getDelta() != 0 || encoder.isFastRotate()) {
+  // КРИТИЧНО: используем isTurn() который НЕ потребляет события
+  if (encoder.isTurn() || encoder.isClick() || encoder.isPress()) {
     lastEncoderActivity = millis();
     // При любой активности восстанавливаем полную яркость
     if (display.getBrightness() != BRIGHTNESS_FULL) {
@@ -136,14 +136,6 @@ void loop() {
     // Режим меню
     menu.tick();
     menu.draw();
-    
-    // В меню также отслеживаем активность для яркости
-    if (encoder.isClick() || encoder.getDelta() != 0) {
-      lastEncoderActivity = millis();
-      if (display.getBrightness() != BRIGHTNESS_FULL) {
-        display.setBrightness(BRIGHTNESS_FULL);
-      }
-    }
   } else {
     // Главный экран
     if (dataUpdated) {
@@ -161,11 +153,6 @@ void loop() {
     // Длинное нажатие на главном экране - вход в меню
     if (encoder.isLongPress()) {
       encoder.clearLongPress();
-      lastEncoderActivity = millis();
-      // Восстанавливаем яркость при входе в меню
-      if (display.getBrightness() != BRIGHTNESS_FULL) {
-        display.setBrightness(BRIGHTNESS_FULL);
-      }
       menu.open();
     }
   }
