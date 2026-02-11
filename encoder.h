@@ -60,7 +60,18 @@ public:
 
   // Проверка быстрого вращения
   bool isFastRotate() {
-    return enc.isFast();
+    // В GyverEncoder есть isFastR() и isFastL() для разных направлений
+    return enc.isFastR() || enc.isFastL();
+  }
+
+  // Проверка быстрого вращения вправо
+  bool isFastRight() {
+    return enc.isFastR();
+  }
+
+  // Проверка быстрого вращения влево
+  bool isFastLeft() {
+    return enc.isFastL();
   }
 
   // Проверка нажатого вращения вправо
@@ -76,6 +87,16 @@ public:
   // Проверка вращения в любую сторону
   bool isTurn() {
     return enc.isTurn();
+  }
+
+  // Проверка вращения вправо
+  bool isRight() {
+    return enc.isRight();
+  }
+
+  // Проверка вращения влево
+  bool isLeft() {
+    return enc.isLeft();
   }
 
   // Сброс позиции (не применимо к GyverEncoder)
@@ -101,6 +122,11 @@ public:
   // Проверка нажатия (с дебаунсом)
   bool isPress() {
     return enc.isPress();
+  }
+
+  // Сброс всех флагов
+  void resetStates() {
+    enc.resetStates();
   }
 };
 
