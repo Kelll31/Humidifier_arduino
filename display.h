@@ -1,6 +1,6 @@
 /*
  * МОДУЛЬ ДИСПЛЕЯ OLED 128x64
- * Отрисовка интерфейса
+ * Отрисовка интерфейса с минимальным количеством перерисовок
  */
 
 #ifndef DISPLAY_H
@@ -15,11 +15,23 @@ GyverOLED<SSD1306_128x64, OLED_BUFFER> oled;
 
 class Display {
 private:
-  unsigned long lastUpdateTime;
-  bool needUpdate;
+  // Кэш предыдущего состояния для уменьшения мерцания
+  float lastTemp;
+  float lastHum;
+  uint8_t lastTargetHum;
+  bool lastRunning;
+  unsigned long lastWorkTime;
+  bool lastSensorOK;
+  bool firstDraw;
 
 public:
-  Display() : lastUpdateTime(0), needUpdate(true) {}
+  Display() : lastTemp(NAN),
+              lastHum(NAN),
+              lastTargetHum(0),
+              lastRunning(false),
+              lastWorkTime(0),
+              lastSensorOK(true),
+              firstDraw(true) {}
 
   // Инициализация дисплея
   void begin() {
@@ -42,93 +54,136 @@ public:
   }
 
   // Главный экран
+  // Теперь перерисовываем только при изменении данных, чтобы убрать полосы
   void drawMainScreen(float temp, float hum, uint8_t targetHum, bool running, unsigned long workTime, bool sensorOK) {
-    oled.clear();
+    // Если данные не изменились и это не первый кадр - просто анимируем статус
+    bool changed = false;
 
-    // Заголовок
-    oled.setScale(1);
-    oled.setCursor(25, 0);
-    oled.print(F("УВЛАЖНИТЕЛЬ"));
+    if (firstDraw || sensorOK != lastSensorOK) changed = true;
+    if (firstDraw || fabs(temp - lastTemp) >= 0.1) changed = true;
+    if (firstDraw || fabs(hum - lastHum) >= 0.1) changed = true;
+    if (firstDraw || targetHum != lastTargetHum) changed = true;
+    if (firstDraw || running != lastRunning) changed = true;
+    if (firstDraw || (workTime / 60) != (lastWorkTime / 60)) changed = true; // обновляем раз в минуту
 
-    // Разделительная линия
-    oled.line(0, 12, 127, 12);
+    if (changed) {
+      oled.clear();
 
-    // Проверка ошибки датчика
-    if (!sensorOK) {
-      oled.setScale(2);
-      oled.setCursor(15, 3);
-      oled.print(F("ОШИБКА"));
+      // Заголовок
       oled.setScale(1);
-      oled.setCursor(20, 6);
-      oled.print(F("Датчик DHT22"));
-      oled.update();
-      return;
-    }
+      oled.setCursor(25, 0);
+      oled.print(F("УВЛАЖНИТЕЛЬ"));
 
-    // Температура
-    oled.setCursor(0, 2);
-    oled.print(F("Темп:"));
-    oled.setScale(2);
-    oled.setCursor(40, 2);
-    if (temp >= -40 && temp <= 80) {
-      oled.print(temp, 1);
-    } else {
-      oled.print(F("--"));
-    }
-    oled.setScale(1);
-    oled.print(F("C"));
+      // Разделительная линия
+      oled.line(0, 12, 127, 12);
 
-    // Влажность
-    oled.setCursor(0, 4);
-    oled.print(F("Влажн:"));
-    oled.setScale(2);
-    oled.setCursor(40, 4);
-    if (hum >= 0 && hum <= 100) {
-      oled.print(hum, 1);
-    } else {
-      oled.print(F("--"));
-    }
-    oled.setScale(1);
-    oled.print(F("%"));
+      // Проверка ошибки датчика
+      if (!sensorOK) {
+        oled.setScale(2);
+        oled.setCursor(15, 3);
+        oled.print(F("ОШИБКА"));
+        oled.setScale(1);
+        oled.setCursor(20, 6);
+        oled.print(F("Датчик DHT22"));
+        oled.update();
 
-    // Прогресс-бар влажности
-    drawProgressBar(0, 52, 127, 8, hum, targetHum);
-
-    // Статус увлажнителя
-    oled.setCursor(0, 7);
-    oled.print(F("Цель:"));
-    oled.print(targetHum);
-    oled.print(F("%"));
-
-    // Время работы (часы)
-    if (workTime >= 3600) {
-      oled.setCursor(50, 7);
-      oled.print(workTime / 3600);
-      oled.print(F("ч"));
-    }
-
-    oled.setCursor(85, 7);
-    if (running) {
-      oled.print(F("ВКЛ"));
-      // Анимация работы
-      uint8_t anim = (millis() / 500) % 3;
-      for (uint8_t i = 0; i <= anim; i++) {
-        oled.print(F("."));
+        // Обновляем кэш
+        lastSensorOK = sensorOK;
+        firstDraw = false;
+        return;
       }
-    } else {
-      oled.print(F("ВЫКЛ"));
+
+      // Температура
+      oled.setCursor(0, 2);
+      oled.print(F("Темп:"));
+      oled.setScale(2);
+      oled.setCursor(40, 2);
+      if (temp >= -40 && temp <= 80) {
+        oled.print(temp, 1);
+      } else {
+        oled.print(F("--"));
+      }
+      oled.setScale(1);
+      oled.print(F("C"));
+
+      // Влажность
+      oled.setCursor(0, 4);
+      oled.print(F("Влажн:"));
+      oled.setScale(2);
+      oled.setCursor(40, 4);
+      if (hum >= 0 && hum <= 100) {
+        oled.print(hum, 1);
+      } else {
+        oled.print(F("--"));
+      }
+      oled.setScale(1);
+      oled.print(F("%"));
+
+      // Прогресс-бар влажности (график снизу)
+      drawProgressBar(0, 52, 127, 8, hum, targetHum);
+
+      // Статус увлажнителя
+      oled.setCursor(0, 7);
+      oled.print(F("Цель:"));
+      oled.print(targetHum);
+      oled.print(F("%"));
+
+      // Время работы (часы)
+      if (workTime >= 3600) {
+        oled.setCursor(50, 7);
+        oled.print(workTime / 3600);
+        oled.print(F("ч"));
+      }
+
+      // Статусный текст, анимацию добавим ниже отдельно
+      oled.setCursor(85, 7);
+      if (running) {
+        oled.print(F("ВКЛ"));
+      } else {
+        oled.print(F("ВЫКЛ"));
+      }
+
+      oled.update();
+
+      // Обновляем кэш
+      lastTemp = temp;
+      lastHum = hum;
+      lastTargetHum = targetHum;
+      lastRunning = running;
+      lastWorkTime = workTime;
+      lastSensorOK = sensorOK;
+      firstDraw = false;
     }
 
-    oled.update();
+    // Отдельно дорисовываем анимацию без полного обновления экрана
+    if (sensorOK) {
+      oled.setScale(1);
+      oled.setCursor(88, 7);
+      if (running) {
+        uint8_t anim = (millis() / 500) % 4; // 0..3
+        for (uint8_t i = 0; i < 3; i++) {
+          if (i < anim) oled.print(F("."));
+          else oled.print(F(" "));
+        }
+      } else {
+        oled.print(F("   "));
+      }
+      oled.update();
+    }
   }
 
-  // Прогресс-бар
+  // Прогресс-бар (график влажности)
   void drawProgressBar(uint8_t x, uint8_t y, uint8_t width, uint8_t height, float value, float maxValue) {
+    // Защита от деления на ноль и некорректных значений
+    if (maxValue < 1) maxValue = 1;
+    if (value < 0) value = 0;
+    if (value > 100) value = 100;
+
     // Рамка
     oled.rect(x, y, x + width, y + height);
 
-    // Заполнение
-    uint8_t fillWidth = (uint8_t)((value / maxValue) * (width - 2));
+    // Заполнение: % от 0 до 100 в ширину бара
+    uint8_t fillWidth = (uint8_t)((value / 100.0) * (width - 2));
     fillWidth = constrain(fillWidth, 0, width - 2);
 
     if (fillWidth > 0) {
