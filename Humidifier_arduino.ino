@@ -12,7 +12,7 @@
  * 
  * Автор: kelll31
  * Дата: 2026-02-11
- * Версия: 1.6 - Humidity Graph
+ * Версия: 1.6 - Humidity Graph + RAM Optimization
  */
 
 #include "config.h"
