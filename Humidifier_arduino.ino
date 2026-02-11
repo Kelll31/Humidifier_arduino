@@ -11,8 +11,8 @@
  * - LED2 на D7 - индикация работы увлажнителя
  * 
  * Автор: kelll31
- * Дата: 2026-02-08
- * Версия: 1.3 - Production Ready
+ * Дата: 2026-02-11
+ * Версия: 1.5 - UI Improvements
  */
 
 #include "config.h"
@@ -34,6 +34,7 @@ Storage storage;
 // Переменные состояния
 unsigned long lastUpdateTime = 0;
 unsigned long lastSaveTime = 0;
+bool dataUpdated = false;  // Флаг обновления данных для экрана
 
 void setup() {
   // Загрузка настроек из EEPROM
@@ -88,9 +89,13 @@ void loop() {
         storage.incrementWorkTime(UPDATE_INTERVAL / 1000);
       }
 
+      // Устанавливаем флаг, что данные обновлены
+      dataUpdated = true;
+
     } else {
       // Мигание LED2 при ошибке
       humidifier.blinkError();
+      dataUpdated = true; // Обновить экран для отображения ошибки
     }
   }
 
@@ -100,15 +105,28 @@ void loop() {
     menu.tick();
     menu.draw();
   } else {
-    // Главный экран
-    display.drawMainScreen(
-      sensor.getTemperature(),
-      sensor.getHumidity(),
-      storage.getMaxHumidity(),
-      humidifier.isRunning(),
-      storage.getWorkTime(),
-      sensor.isOK()
-    );
+    // Главный экран - обновляем только при обновлении данных с датчика
+    if (dataUpdated) {
+      display.drawMainScreen(
+        sensor.getTemperature(),
+        sensor.getHumidity(),
+        storage.getMaxHumidity(),
+        humidifier.isRunning(),
+        storage.getWorkTime(),
+        sensor.isOK()
+      );
+      dataUpdated = false;
+    } else {
+      // Даже если данные не обновлены, вызываем для анимации
+      display.drawMainScreen(
+        sensor.getTemperature(),
+        sensor.getHumidity(),
+        storage.getMaxHumidity(),
+        humidifier.isRunning(),
+        storage.getWorkTime(),
+        sensor.isOK()
+      );
+    }
     
     // Длинное нажатие на главном экране - вход в меню
     if (encoder.isLongPress()) {
