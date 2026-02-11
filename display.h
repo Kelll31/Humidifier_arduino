@@ -47,7 +47,7 @@ public:
   void showSplash() {
     oled.clear();
     oled.setScale(2);
-    oled.setCursor(10, 2);
+    oled.setCursor(0, 2);
     oled.print(F("УВЛАЖНИТЕЛЬ"));
     oled.setScale(1);
     oled.setCursor(30, 6);
