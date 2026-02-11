@@ -75,8 +75,9 @@ void loop() {
   encoder.tick();
   
   // Отслеживание активности энкодера для управления яркостью
-  // КРИТИЧНО: используем isTurn() который НЕ потребляет события
-  if (encoder.isTurn() || encoder.isClick() || encoder.isPress()) {
+  // КРИТИЧНО: используем только isTurn() и isPress() которые НЕ потребляют события
+  // НЕ используем isClick(), isRight(), isLeft() - они потребляют события!
+  if (encoder.isTurn() || encoder.isPress()) {
     lastEncoderActivity = millis();
     // При любой активности восстанавливаем полную яркость
     if (display.getBrightness() != BRIGHTNESS_FULL) {
