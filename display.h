@@ -15,7 +15,7 @@ GyverOLED<SSD1306_128x64, OLED_BUFFER> oled;
 
 class Display {
 private:
-  // Кэш предыдущего состояния для уменьшения мерцания
+  // Кэш предыдущего состояния
   float lastTemp;
   float lastHum;
   uint8_t lastTargetHum;
@@ -55,7 +55,16 @@ public:
     oled.update();
   }
 
-  // Главный экран
+  /*
+   * Раскладка главного экрана (128x64, 8 строк по 8px):
+   *
+   * Row 0 (y= 0.. 7): "УВЛАЖНИТЕЛЬ"
+   * y=12: разделительная линия
+   * Row 2 (y=16..31): "Темп:" + число scale2 (занимает 2 строки)
+   * Row 4 (y=32..47): "Влажн:" + число scale2 (занимает 2 строки)
+   * Row 6 (y=48..55): Прогресс-бар влажности
+   * Row 7 (y=56..63): "Цель:XX%  ВКЛ/ВЫКЛ"
+   */
   void drawMainScreen(float temp, float hum, uint8_t targetHum, bool running, unsigned long workTime, bool sensorOK) {
     // Проверяем, что изменилось
     bool changed = false;
@@ -88,13 +97,12 @@ public:
         oled.print(F("Датчик DHT22"));
         oled.update();
 
-        // Обновляем кэш
         lastSensorOK = sensorOK;
         firstDraw = false;
         return;
       }
 
-      // Температура
+      // Температура (row 2-3, y=16..31)
       oled.setCursor(0, 2);
       oled.print(F("Темп:"));
       oled.setScale(2);
@@ -107,7 +115,7 @@ public:
       oled.setScale(1);
       oled.print(F("C"));
 
-      // Влажность
+      // Влажность (row 4-5, y=32..47)
       oled.setCursor(0, 4);
       oled.print(F("Влажн:"));
       oled.setScale(2);
@@ -120,10 +128,11 @@ public:
       oled.setScale(1);
       oled.print(F("%"));
 
-      // Прогресс-бар влажности
-      drawProgressBar(0, 52, 127, 8, hum, targetHum);
+      // Прогресс-бар влажности (row 6, y=48..55)
+      // Высота 7px чтобы не залезть на row 7 (y=56)
+      drawProgressBar(0, 48, 127, 7, hum);
 
-      // Статус увлажнителя и целевая влажность
+      // Статусная строка (row 7, y=56..63)
       oled.setCursor(0, 7);
       oled.print(F("Цель:"));
       oled.print(targetHum);
@@ -136,7 +145,7 @@ public:
         oled.print(F("ч"));
       }
 
-      // Статус (без анимации, её рисуем отдельно)
+      // Статус
       oled.setCursor(90, 7);
       if (running) {
         oled.print(F("ВКЛ"));
@@ -154,21 +163,19 @@ public:
       lastWorkTime = workTime;
       lastSensorOK = sensorOK;
       firstDraw = false;
-      lastAnimFrame = 255; // сбрасываем анимацию
+      lastAnimFrame = 255;
     }
 
     // Анимация точек только если работает
     if (sensorOK && running) {
-      uint8_t anim = (millis() / 500) % 4; // 0..3
-      
-      // Обновляем только если кадр анимации изменился
+      uint8_t anim = (millis() / 500) % 4;
+
       if (anim != lastAnimFrame) {
         lastAnimFrame = anim;
-        
+
         oled.setScale(1);
         oled.setCursor(108, 7);
-        
-        // Рисуем точки в зависимости от кадра
+
         for (uint8_t i = 0; i < 3; i++) {
           if (i < anim) {
             oled.print(F("."));
@@ -179,7 +186,6 @@ public:
         oled.update();
       }
     } else if (sensorOK && !running && lastAnimFrame != 255) {
-      // Если остановились - очищаем точки
       oled.setScale(1);
       oled.setCursor(108, 7);
       oled.print(F("   "));
@@ -188,9 +194,8 @@ public:
     }
   }
 
-  // Прогресс-бар
-  void drawProgressBar(uint8_t x, uint8_t y, uint8_t width, uint8_t height, float value, float maxValue) {
-    if (maxValue < 1) maxValue = 1;
+  // Прогресс-бар (0-100%)
+  void drawProgressBar(uint8_t x, uint8_t y, uint8_t width, uint8_t height, float value) {
     if (value < 0) value = 0;
     if (value > 100) value = 100;
 
@@ -209,7 +214,7 @@ public:
   // Экран "О системе"
   void drawAboutScreen(unsigned long workTime, uint8_t switchCount, unsigned long totalSwitches) {
     oled.clear();
-    
+
     oled.setScale(1);
     oled.setCursor(20, 0);
     oled.print(F("О СИСТЕМЕ"));
@@ -222,7 +227,6 @@ public:
     oled.setCursor(0, 3);
     oled.print(F("Автор: kelll31"));
 
-    // Время работы
     oled.setCursor(0, 4);
     oled.print(F("Работа: "));
     if (workTime >= 3600) {
@@ -232,13 +236,11 @@ public:
     oled.print((workTime % 3600) / 60);
     oled.print(F("м"));
 
-    // Количество переключений в час
     oled.setCursor(0, 5);
     oled.print(F("Перекл:"));
     oled.print(switchCount);
     oled.print(F("/час"));
 
-    // Общее количество переключений
     oled.setCursor(0, 6);
     oled.print(F("Всего: "));
     oled.print(totalSwitches);
@@ -252,13 +254,12 @@ public:
   // Экран калибровки
   void drawCalibrationScreen(float currentTemp, float currentHum, float tempCal, float humCal, bool editingTemp) {
     oled.clear();
-    
+
     oled.setScale(1);
     oled.setCursor(15, 0);
     oled.print(F("КАЛИБРОВКА"));
     oled.line(0, 10, 127, 10);
 
-    // Текущие значения
     oled.setCursor(0, 2);
     oled.print(F("Т: "));
     oled.print(currentTemp, 1);
@@ -266,7 +267,6 @@ public:
     oled.print(currentHum, 1);
     oled.print(F("%"));
 
-    // Коррекция температуры
     oled.setCursor(0, 4);
     if (editingTemp) oled.print(F("> "));
     oled.print(F("Корр.Т: "));
@@ -274,7 +274,6 @@ public:
     oled.print(tempCal, 1);
     oled.print(F("C"));
 
-    // Коррекция влажности
     oled.setCursor(0, 5);
     if (!editingTemp) oled.print(F("> "));
     oled.print(F("Корр.В: "));
