@@ -12,7 +12,7 @@
  * 
  * Автор: kelll31
  * Дата: 2026-02-11
- * Версия: 1.6 - Humidity Graph + RAM Optimization
+ * Версия: 1.7 - Auto Brightness + Humidity Graph
  */
 
 #include "config.h"
@@ -34,6 +34,7 @@ Storage storage;
 // Переменные состояния
 unsigned long lastUpdateTime = 0;
 unsigned long lastSaveTime = 0;
+unsigned long lastEncoderActivity = 0;
 bool dataUpdated = false;
 
 void setup() {
@@ -61,6 +62,9 @@ void setup() {
 
   // Включение watchdog timer
   wdt_enable(WDTO_4S);
+  
+  // Инициализация таймера активности энкодера
+  lastEncoderActivity = millis();
 }
 
 void loop() {
@@ -69,6 +73,30 @@ void loop() {
 
   // Обработка энкодера
   encoder.tick();
+  
+  // Отслеживание активности энкодера
+  if (encoder.isClick() || encoder.isLongPress() || encoder.getDelta() != 0 || encoder.isFastRotate()) {
+    lastEncoderActivity = millis();
+    // При любой активности восстанавливаем полную яркость
+    if (display.getBrightness() != BRIGHTNESS_FULL) {
+      display.setBrightness(BRIGHTNESS_FULL);
+    }
+  }
+
+  // Автоматическое затемнение дисплея
+  unsigned long inactiveTime = millis() - lastEncoderActivity;
+  
+  if (inactiveTime >= DIM_TIMEOUT_2) {
+    // Более 3 минут без активности - 20% яркости
+    if (display.getBrightness() != BRIGHTNESS_DIM2) {
+      display.setBrightness(BRIGHTNESS_DIM2);
+    }
+  } else if (inactiveTime >= DIM_TIMEOUT_1) {
+    // Более 10 секунд без активности - 75% яркости
+    if (display.getBrightness() != BRIGHTNESS_DIM1) {
+      display.setBrightness(BRIGHTNESS_DIM1);
+    }
+  }
 
   // Обработка storage
   storage.tick();
