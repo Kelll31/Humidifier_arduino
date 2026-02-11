@@ -1,6 +1,6 @@
 /*
  * МОДУЛЬ ДИСПЛЕЯ OLED 128x64
- * Отрисовка интерфейса с минимальным количеством перерисовок
+ * Отрисовка интерфейса с графиком влажности
  */
 
 #ifndef DISPLAY_H
@@ -13,6 +13,10 @@
 // Используем GyverOLED для работы с SSD1306
 GyverOLED<SSD1306_128x64, OLED_BUFFER> oled;
 
+// График влажности
+#define GRAPH_POINTS 64  // количество точек графика
+#define GRAPH_HEIGHT 20  // высота графика в пикселях
+
 class Display {
 private:
   // Кэш предыдущего состояния
@@ -23,7 +27,12 @@ private:
   unsigned long lastWorkTime;
   bool lastSensorOK;
   bool firstDraw;
-  uint8_t lastAnimFrame;
+
+  // Данные графика
+  float humidityGraph[GRAPH_POINTS];
+  bool humidifierState[GRAPH_POINTS];  // состояние увлажнителя
+  uint8_t graphIndex;
+  bool graphFilled;
 
 public:
   Display() : lastTemp(NAN),
@@ -33,7 +42,14 @@ public:
               lastWorkTime(0),
               lastSensorOK(true),
               firstDraw(true),
-              lastAnimFrame(255) {}
+              graphIndex(0),
+              graphFilled(false) {
+    // Инициализация графика
+    for (uint8_t i = 0; i < GRAPH_POINTS; i++) {
+      humidityGraph[i] = 50.0;
+      humidifierState[i] = false;
+    }
+  }
 
   // Инициализация дисплея
   void begin() {
@@ -55,16 +71,74 @@ public:
     oled.update();
   }
 
-  /*
-   * Раскладка главного экрана (128x64, 8 строк по 8px):
-   *
-   * Row 0 (y= 0.. 7): "УВЛАЖНИТЕЛЬ"
-   * y=12: разделительная линия
-   * Row 2 (y=16..31): "Темп:" + число scale2 (занимает 2 строки)
-   * Row 4 (y=32..47): "Влажн:" + число scale2 (занимает 2 строки)
-   * Row 6 (y=48..55): Прогресс-бар влажности
-   * Row 7 (y=56..63): "Цель:XX%  ВКЛ/ВЫКЛ"
-   */
+  // Добавление точки на график
+  void addGraphPoint(float humidity, bool running) {
+    humidityGraph[graphIndex] = humidity;
+    humidifierState[graphIndex] = running;
+    graphIndex++;
+    
+    if (graphIndex >= GRAPH_POINTS) {
+      graphIndex = 0;
+      graphFilled = true;
+    }
+  }
+
+  // Отрисовка графика влажности
+  void drawHumidityGraph(uint8_t x, uint8_t y, uint8_t width, uint8_t height) {
+    // Рамка графика
+    oled.rect(x, y, x + width - 1, y + height - 1);
+
+    uint8_t pointsToShow = graphFilled ? GRAPH_POINTS : graphIndex;
+    if (pointsToShow < 2) return;
+
+    // Находим min/max для масштабирования
+    float minHum = 100, maxHum = 0;
+    for (uint8_t i = 0; i < pointsToShow; i++) {
+      uint8_t idx = graphFilled ? (graphIndex + i) % GRAPH_POINTS : i;
+      float h = humidityGraph[idx];
+      if (h < minHum) minHum = h;
+      if (h > maxHum) maxHum = h;
+    }
+
+    // Добавляем отступы для красоты
+    float range = maxHum - minHum;
+    if (range < 10) range = 10;  // минимальный диапазон 10%
+    minHum -= range * 0.1;
+    maxHum += range * 0.1;
+    if (minHum < 0) minHum = 0;
+    if (maxHum > 100) maxHum = 100;
+
+    // Рисуем график
+    for (uint8_t i = 1; i < pointsToShow; i++) {
+      uint8_t idx1 = graphFilled ? (graphIndex + i - 1) % GRAPH_POINTS : i - 1;
+      uint8_t idx2 = graphFilled ? (graphIndex + i) % GRAPH_POINTS : i;
+
+      float hum1 = humidityGraph[idx1];
+      float hum2 = humidityGraph[idx2];
+
+      // Нормализация в координаты экрана
+      uint8_t x1 = x + 1 + ((i - 1) * (width - 2)) / (pointsToShow - 1);
+      uint8_t x2 = x + 1 + (i * (width - 2)) / (pointsToShow - 1);
+      
+      uint8_t y1 = y + height - 2 - ((hum1 - minHum) * (height - 3)) / (maxHum - minHum);
+      uint8_t y2 = y + height - 2 - ((hum2 - minHum) * (height - 3)) / (maxHum - minHum);
+
+      // Ограничение координат
+      y1 = constrain(y1, y + 1, y + height - 2);
+      y2 = constrain(y2, y + 1, y + height - 2);
+
+      // Линия графика
+      oled.line(x1, y1, x2, y2);
+
+      // Отметки включения увлажнителя (маленький квадратик)
+      if (humidifierState[idx2] && x2 >= x + 1 && x2 <= x + width - 2) {
+        oled.dot(x2, y + height - 3);
+        oled.dot(x2, y + height - 4);
+      }
+    }
+  }
+
+  // Главный экран
   void drawMainScreen(float temp, float hum, uint8_t targetHum, bool running, unsigned long workTime, bool sensorOK) {
     // Проверяем, что изменилось
     bool changed = false;
@@ -102,7 +176,7 @@ public:
         return;
       }
 
-      // Температура (row 2-3, y=16..31)
+      // Температура
       oled.setCursor(0, 2);
       oled.print(F("Темп:"));
       oled.setScale(2);
@@ -115,7 +189,7 @@ public:
       oled.setScale(1);
       oled.print(F("C"));
 
-      // Влажность (row 4-5, y=32..47)
+      // Влажность
       oled.setCursor(0, 4);
       oled.print(F("Влажн:"));
       oled.setScale(2);
@@ -128,30 +202,8 @@ public:
       oled.setScale(1);
       oled.print(F("%"));
 
-      // Прогресс-бар влажности (row 6, y=48..55)
-      // Высота 7px чтобы не залезть на row 7 (y=56)
-      drawProgressBar(0, 48, 127, 7, hum);
-
-      // Статусная строка (row 7, y=56..63)
-      oled.setCursor(0, 7);
-      oled.print(F("Цель:"));
-      oled.print(targetHum);
-      oled.print(F("%"));
-
-      // Время работы (часы)
-      if (workTime >= 3600) {
-        oled.setCursor(60, 7);
-        oled.print(workTime / 3600);
-        oled.print(F("ч"));
-      }
-
-      // Статус
-      oled.setCursor(90, 7);
-      if (running) {
-        oled.print(F("ВКЛ"));
-      } else {
-        oled.print(F("ВЫКЛ"));
-      }
+      // График влажности внизу (y=44, высота 20px)
+      drawHumidityGraph(0, 44, 128, GRAPH_HEIGHT);
 
       oled.update();
 
@@ -163,51 +215,6 @@ public:
       lastWorkTime = workTime;
       lastSensorOK = sensorOK;
       firstDraw = false;
-      lastAnimFrame = 255;
-    }
-
-    // Анимация точек только если работает
-    if (sensorOK && running) {
-      uint8_t anim = (millis() / 500) % 4;
-
-      if (anim != lastAnimFrame) {
-        lastAnimFrame = anim;
-
-        oled.setScale(1);
-        oled.setCursor(108, 7);
-
-        for (uint8_t i = 0; i < 3; i++) {
-          if (i < anim) {
-            oled.print(F("."));
-          } else {
-            oled.print(F(" "));
-          }
-        }
-        oled.update();
-      }
-    } else if (sensorOK && !running && lastAnimFrame != 255) {
-      oled.setScale(1);
-      oled.setCursor(108, 7);
-      oled.print(F("   "));
-      oled.update();
-      lastAnimFrame = 255;
-    }
-  }
-
-  // Прогресс-бар (0-100%)
-  void drawProgressBar(uint8_t x, uint8_t y, uint8_t width, uint8_t height, float value) {
-    if (value < 0) value = 0;
-    if (value > 100) value = 100;
-
-    // Рамка
-    oled.rect(x, y, x + width, y + height);
-
-    // Заполнение
-    uint8_t fillWidth = (uint8_t)((value / 100.0) * (width - 2));
-    fillWidth = constrain(fillWidth, 0, width - 2);
-
-    if (fillWidth > 0) {
-      oled.rect(x + 1, y + 1, x + 1 + fillWidth, y + height - 1, OLED_FILL);
     }
   }
 
