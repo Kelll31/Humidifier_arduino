@@ -54,6 +54,9 @@ private:
   // Экран "О системе"
   bool aboutMode;
 
+  // Флаг необходимости перерисовки экрана меню
+  bool needRedraw;
+
   const char* menuItems[7] = {
     "1.Мин.влажность",
     "2.Макс.влажность",
@@ -79,7 +82,8 @@ public:
            calibrationStep(0),
            tempCalValue(0),
            humCalValue(0),
-           aboutMode(false) {}
+           aboutMode(false),
+           needRedraw(true) {}
 
   // Инициализация
   void begin(Display* disp, EncoderModule* enc, Storage* stor, Sensor* sens, Humidifier* hum) {
@@ -97,6 +101,7 @@ public:
     editMode = false;
     calibrationMode = false;
     aboutMode = false;
+    needRedraw = true;       // при входе обязательно перерисовать
     encoder->resetPosition();
     lastActivityTime = millis();
   }
@@ -151,12 +156,14 @@ public:
       if (currentItem > MENU_EXIT) currentItem = 0;
 
       lastActivityTime = millis();
+      needRedraw = true;   // при движении по меню нужно перерисовать
     }
 
     // Короткое нажатие - выбор пункта
     if (encoder->isClick()) {
       selectMenuItem();
       lastActivityTime = millis();
+      needRedraw = true;   // сменился режим/экран
     }
 
     // Длинное нажатие - выход из меню
@@ -192,6 +199,7 @@ public:
       }
 
       lastActivityTime = millis();
+      needRedraw = true;   // поменялось значение
     }
 
     // Короткое нажатие - сохранить
@@ -200,6 +208,7 @@ public:
       editMode = false;
       encoder->resetPosition();
       lastActivityTime = millis();
+      needRedraw = true;   // выходим из режима редактирования
     }
 
     // Длинное нажатие - отмена
@@ -208,6 +217,7 @@ public:
       editMode = false;
       encoder->resetPosition();
       lastActivityTime = millis();
+      needRedraw = true;
     }
   }
 
@@ -230,6 +240,7 @@ public:
       }
 
       lastActivityTime = millis();
+      needRedraw = true;   // изменилось значение калибровки
     }
 
     // Короткое нажатие - переключение между Т и В
@@ -237,6 +248,7 @@ public:
       calibrationStep = (calibrationStep == CAL_TEMP) ? CAL_HUM : CAL_TEMP;
       encoder->resetPosition();
       lastActivityTime = millis();
+      needRedraw = true;
     }
 
     // Длинное нажатие - сохранить и выйти
@@ -248,17 +260,20 @@ public:
       calibrationMode = false;
       encoder->resetPosition();
       lastActivityTime = millis();
+      needRedraw = true;
     }
   }
 
   // Режим "О системе"
   void handleAboutMode() {
+    // Здесь изменений мало, экран статичный, перерисовывается только при входе
     // Длинное нажатие - выход
     if (encoder->isLongPress()) {
       encoder->clearLongPress();
       aboutMode = false;
       encoder->resetPosition();
       lastActivityTime = millis();
+      needRedraw = true;
     }
   }
 
@@ -329,6 +344,10 @@ public:
   // Отрисовка меню
   void draw() {
     if (!active) return;
+
+    // Ничего не делаем, если экран не требует перерисовки
+    if (!needRedraw) return;
+    needRedraw = false;
 
     display->clear();
 
