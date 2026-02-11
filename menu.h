@@ -58,13 +58,13 @@ private:
   bool needRedraw;
 
   const char* menuItems[7] = {
-    "1.Мин.влажность",
-    "2.Макс.влажность",
-    "3.Гистерезис",
-    "4.Калибровка",
-    "5.Сброс статистики",
-    "6.О системе",
-    "7.Выход"
+    "Мин.влажность",
+    "Макс.влажность",
+    "Гистерезис",
+    "Калибровка",
+    "Сброс статистики",
+    "О системе",
+    "Выход"
   };
 
 public:
@@ -101,7 +101,7 @@ public:
     editMode = false;
     calibrationMode = false;
     aboutMode = false;
-    needRedraw = true;       // при входе обязательно перерисовать
+    needRedraw = true;
     encoder->resetPosition();
     lastActivityTime = millis();
   }
@@ -156,14 +156,14 @@ public:
       if (currentItem > MENU_EXIT) currentItem = 0;
 
       lastActivityTime = millis();
-      needRedraw = true;   // при движении по меню нужно перерисовать
+      needRedraw = true;
     }
 
     // Короткое нажатие - выбор пункта
     if (encoder->isClick()) {
       selectMenuItem();
       lastActivityTime = millis();
-      needRedraw = true;   // сменился режим/экран
+      needRedraw = true;
     }
 
     // Длинное нажатие - выход из меню
@@ -199,7 +199,7 @@ public:
       }
 
       lastActivityTime = millis();
-      needRedraw = true;   // поменялось значение
+      needRedraw = true;
     }
 
     // Короткое нажатие - сохранить
@@ -208,7 +208,7 @@ public:
       editMode = false;
       encoder->resetPosition();
       lastActivityTime = millis();
-      needRedraw = true;   // выходим из режима редактирования
+      needRedraw = true;
     }
 
     // Длинное нажатие - отмена
@@ -240,7 +240,7 @@ public:
       }
 
       lastActivityTime = millis();
-      needRedraw = true;   // изменилось значение калибровки
+      needRedraw = true;
     }
 
     // Короткое нажатие - переключение между Т и В
@@ -266,7 +266,6 @@ public:
 
   // Режим "О системе"
   void handleAboutMode() {
-    // Здесь изменений мало, экран статичный, перерисовывается только при входе
     // Длинное нажатие - выход
     if (encoder->isLongPress()) {
       encoder->clearLongPress();
@@ -382,22 +381,26 @@ public:
     display->print(F("МЕНЮ"));
     display->drawLine(0, 10, 127, 10);
 
-    // Отображаем 3 пункта: текущий, предыдущий, следующий
-    int8_t startItem = currentItem - 1;
+    // Отображаем 5 пунктов: текущий, 2 предыдущих, 2 следующих
+    int8_t startItem = currentItem - 2;
+    if (startItem < 0) startItem = 0;
+    if (startItem > MENU_EXIT - 4) startItem = MENU_EXIT - 4;
     if (startItem < 0) startItem = 0;
 
-    for (uint8_t i = 0; i < 3; i++) {
+    for (uint8_t i = 0; i < 5; i++) {
       uint8_t itemIndex = startItem + i;
       if (itemIndex > MENU_EXIT) break;
 
-      uint8_t y = 2 + i * 2;
+      uint8_t y = 2 + i;
 
-      // Выделение текущего пункта
+      // Стрелка "> " для текущего пункта
       if (itemIndex == currentItem) {
-        display->drawRect(0, y * 8, 127, y * 8 + 10, true);
+        display->setCursor(0, y);
+        display->print(F(">"));
       }
 
-      display->setCursor(2, y);
+      // Текст пункта
+      display->setCursor(10, y);
       display->print(menuItems[itemIndex]);
     }
 
@@ -415,7 +418,7 @@ public:
 
     // Название параметра
     display->setCursor(0, 2);
-    display->print(menuItems[currentItem] + 2); // Пропускаем "1."
+    display->print(menuItems[currentItem]);
 
     // Значение
     display->setScale(3);
