@@ -23,6 +23,7 @@ private:
   unsigned long lastWorkTime;
   bool lastSensorOK;
   bool firstDraw;
+  uint8_t lastAnimFrame;
 
 public:
   Display() : lastTemp(NAN),
@@ -31,7 +32,8 @@ public:
               lastRunning(false),
               lastWorkTime(0),
               lastSensorOK(true),
-              firstDraw(true) {}
+              firstDraw(true),
+              lastAnimFrame(255) {}
 
   // Инициализация дисплея
   void begin() {
@@ -54,9 +56,8 @@ public:
   }
 
   // Главный экран
-  // Теперь перерисовываем только при изменении данных, чтобы убрать полосы
   void drawMainScreen(float temp, float hum, uint8_t targetHum, bool running, unsigned long workTime, bool sensorOK) {
-    // Если данные не изменились и это не первый кадр - просто анимируем статус
+    // Проверяем, что изменилось
     bool changed = false;
 
     if (firstDraw || sensorOK != lastSensorOK) changed = true;
@@ -64,7 +65,7 @@ public:
     if (firstDraw || fabs(hum - lastHum) >= 0.1) changed = true;
     if (firstDraw || targetHum != lastTargetHum) changed = true;
     if (firstDraw || running != lastRunning) changed = true;
-    if (firstDraw || (workTime / 60) != (lastWorkTime / 60)) changed = true; // обновляем раз в минуту
+    if (firstDraw || (workTime / 60) != (lastWorkTime / 60)) changed = true;
 
     if (changed) {
       oled.clear();
@@ -119,10 +120,10 @@ public:
       oled.setScale(1);
       oled.print(F("%"));
 
-      // Прогресс-бар влажности (график снизу)
+      // Прогресс-бар влажности
       drawProgressBar(0, 52, 127, 8, hum, targetHum);
 
-      // Статус увлажнителя
+      // Статус увлажнителя и целевая влажность
       oled.setCursor(0, 7);
       oled.print(F("Цель:"));
       oled.print(targetHum);
@@ -130,13 +131,13 @@ public:
 
       // Время работы (часы)
       if (workTime >= 3600) {
-        oled.setCursor(50, 7);
+        oled.setCursor(60, 7);
         oled.print(workTime / 3600);
         oled.print(F("ч"));
       }
 
-      // Статусный текст, анимацию добавим ниже отдельно
-      oled.setCursor(85, 7);
+      // Статус (без анимации, её рисуем отдельно)
+      oled.setCursor(90, 7);
       if (running) {
         oled.print(F("ВКЛ"));
       } else {
@@ -153,28 +154,42 @@ public:
       lastWorkTime = workTime;
       lastSensorOK = sensorOK;
       firstDraw = false;
+      lastAnimFrame = 255; // сбрасываем анимацию
     }
 
-    // Отдельно дорисовываем анимацию без полного обновления экрана
-    if (sensorOK) {
-      oled.setScale(1);
-      oled.setCursor(88, 7);
-      if (running) {
-        uint8_t anim = (millis() / 500) % 4; // 0..3
+    // Анимация точек только если работает
+    if (sensorOK && running) {
+      uint8_t anim = (millis() / 500) % 4; // 0..3
+      
+      // Обновляем только если кадр анимации изменился
+      if (anim != lastAnimFrame) {
+        lastAnimFrame = anim;
+        
+        oled.setScale(1);
+        oled.setCursor(108, 7);
+        
+        // Рисуем точки в зависимости от кадра
         for (uint8_t i = 0; i < 3; i++) {
-          if (i < anim) oled.print(F("."));
-          else oled.print(F(" "));
+          if (i < anim) {
+            oled.print(F("."));
+          } else {
+            oled.print(F(" "));
+          }
         }
-      } else {
-        oled.print(F("   "));
+        oled.update();
       }
+    } else if (sensorOK && !running && lastAnimFrame != 255) {
+      // Если остановились - очищаем точки
+      oled.setScale(1);
+      oled.setCursor(108, 7);
+      oled.print(F("   "));
       oled.update();
+      lastAnimFrame = 255;
     }
   }
 
-  // Прогресс-бар (график влажности)
+  // Прогресс-бар
   void drawProgressBar(uint8_t x, uint8_t y, uint8_t width, uint8_t height, float value, float maxValue) {
-    // Защита от деления на ноль и некорректных значений
     if (maxValue < 1) maxValue = 1;
     if (value < 0) value = 0;
     if (value > 100) value = 100;
@@ -182,7 +197,7 @@ public:
     // Рамка
     oled.rect(x, y, x + width, y + height);
 
-    // Заполнение: % от 0 до 100 в ширину бара
+    // Заполнение
     uint8_t fillWidth = (uint8_t)((value / 100.0) * (width - 2));
     fillWidth = constrain(fillWidth, 0, width - 2);
 
