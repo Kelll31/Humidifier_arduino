@@ -61,7 +61,7 @@
 #define SCREEN_TIMEOUT          30000 // Таймаут гашения экрана (мс)
 
 // Автоматическое затемнение дисплея
-#define BRIGHTNESS_FULL         255   // 100% яркость
+#define BRIGHTNESS_FULL         235   // 100% яркость
 #define BRIGHTNESS_DIM1         191   // 75% яркость
 #define BRIGHTNESS_DIM2         51    // 20% яркость
 #define DIM_TIMEOUT_1           10000 // 10 секунд до первого затемнения (мс)
