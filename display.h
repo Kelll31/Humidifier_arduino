@@ -93,11 +93,19 @@ public:
 
   // Отрисовка графика влажности
   void drawHumidityGraph(uint8_t x, uint8_t y, uint8_t width, uint8_t height) {
+    uint8_t pointsToShow = graphFilled ? GRAPH_POINTS : graphIndex;
+    
+    // Если меньше 2 точек - показываем только рамку с текстом
+    if (pointsToShow < 2) {
+      oled.rect(x, y, x + width - 1, y + height - 1);
+      oled.setScale(1);
+      oled.setCursor(x + 25, y + 1);
+      oled.print(F("Накопление..."));
+      return;
+    }
+
     // Рамка графика
     oled.rect(x, y, x + width - 1, y + height - 1);
-
-    uint8_t pointsToShow = graphFilled ? GRAPH_POINTS : graphIndex;
-    if (pointsToShow < 2) return;
 
     // Находим min/max для масштабирования
     uint8_t minHum = 100, maxHum = 0;
