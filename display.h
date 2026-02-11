@@ -13,9 +13,9 @@
 // Используем GyverOLED для работы с SSD1306
 GyverOLED<SSD1306_128x64, OLED_BUFFER> oled;
 
-// График влажности
-#define GRAPH_POINTS 64  // количество точек графика
-#define GRAPH_HEIGHT 20  // высота графика в пикселях
+// График влажности - уменьшено до 32 точек для экономии RAM
+#define GRAPH_POINTS 32  // 32 точки = ~1 минута истории
+#define GRAPH_HEIGHT 20
 
 class Display {
 private:
@@ -28,9 +28,9 @@ private:
   bool lastSensorOK;
   bool firstDraw;
 
-  // Данные графика
-  float humidityGraph[GRAPH_POINTS];
-  bool humidifierState[GRAPH_POINTS];  // состояние увлажнителя
+  // Данные графика - уменьшено до 32 точек
+  uint8_t humidityGraph[GRAPH_POINTS];  // храним как uint8_t вместо float (4 байта -> 1 байт)
+  uint8_t humidifierState;              // битовое хранение для 32 точек (32 байта -> 4 байта)
   uint8_t graphIndex;
   bool graphFilled;
 
@@ -43,11 +43,11 @@ public:
               lastSensorOK(true),
               firstDraw(true),
               graphIndex(0),
-              graphFilled(false) {
+              graphFilled(false),
+              humidifierState(0) {
     // Инициализация графика
     for (uint8_t i = 0; i < GRAPH_POINTS; i++) {
-      humidityGraph[i] = 50.0;
-      humidifierState[i] = false;
+      humidityGraph[i] = 50;
     }
   }
 
@@ -73,8 +73,16 @@ public:
 
   // Добавление точки на график
   void addGraphPoint(float humidity, bool running) {
-    humidityGraph[graphIndex] = humidity;
-    humidifierState[graphIndex] = running;
+    // Сохраняем влажность как uint8_t (0-100)
+    humidityGraph[graphIndex] = constrain((uint8_t)humidity, 0, 100);
+    
+    // Сохраняем состояние увлажнителя в битовом виде
+    if (running) {
+      bitSet(humidifierState, graphIndex);
+    } else {
+      bitClear(humidifierState, graphIndex);
+    }
+    
     graphIndex++;
     
     if (graphIndex >= GRAPH_POINTS) {
@@ -92,29 +100,31 @@ public:
     if (pointsToShow < 2) return;
 
     // Находим min/max для масштабирования
-    float minHum = 100, maxHum = 0;
+    uint8_t minHum = 100, maxHum = 0;
     for (uint8_t i = 0; i < pointsToShow; i++) {
       uint8_t idx = graphFilled ? (graphIndex + i) % GRAPH_POINTS : i;
-      float h = humidityGraph[idx];
+      uint8_t h = humidityGraph[idx];
       if (h < minHum) minHum = h;
       if (h > maxHum) maxHum = h;
     }
 
     // Добавляем отступы для красоты
-    float range = maxHum - minHum;
-    if (range < 10) range = 10;  // минимальный диапазон 10%
-    minHum -= range * 0.1;
-    maxHum += range * 0.1;
-    if (minHum < 0) minHum = 0;
-    if (maxHum > 100) maxHum = 100;
+    uint8_t range = maxHum - minHum;
+    if (range < 10) range = 10;
+    
+    if (minHum > range / 10) minHum -= range / 10;
+    else minHum = 0;
+    
+    if (maxHum + range / 10 <= 100) maxHum += range / 10;
+    else maxHum = 100;
 
     // Рисуем график
     for (uint8_t i = 1; i < pointsToShow; i++) {
       uint8_t idx1 = graphFilled ? (graphIndex + i - 1) % GRAPH_POINTS : i - 1;
       uint8_t idx2 = graphFilled ? (graphIndex + i) % GRAPH_POINTS : i;
 
-      float hum1 = humidityGraph[idx1];
-      float hum2 = humidityGraph[idx2];
+      uint8_t hum1 = humidityGraph[idx1];
+      uint8_t hum2 = humidityGraph[idx2];
 
       // Нормализация в координаты экрана
       uint8_t x1 = x + 1 + ((i - 1) * (width - 2)) / (pointsToShow - 1);
@@ -130,8 +140,8 @@ public:
       // Линия графика
       oled.line(x1, y1, x2, y2);
 
-      // Отметки включения увлажнителя (маленький квадратик)
-      if (humidifierState[idx2] && x2 >= x + 1 && x2 <= x + width - 2) {
+      // Отметки включения увлажнителя
+      if (bitRead(humidifierState, idx2) && x2 >= x + 1 && x2 <= x + width - 2) {
         oled.dot(x2, y + height - 3);
         oled.dot(x2, y + height - 4);
       }
@@ -202,7 +212,7 @@ public:
       oled.setScale(1);
       oled.print(F("%"));
 
-      // График влажности внизу (y=44, высота 20px)
+      // График влажности внизу
       drawHumidityGraph(0, 44, 128, GRAPH_HEIGHT);
 
       oled.update();
