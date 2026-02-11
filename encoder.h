@@ -1,26 +1,25 @@
 /*
  * МОДУЛЬ ЭНКОДЕРА
- * Обработка вращения и нажатий с использованием библиотеки EncButton
- * Современная замена устаревшей GyverEncoder
+ * Обработка вращения и нажатий с использованием библиотеки GyverEncoder
  */
 
 #ifndef ENCODER_H
 #define ENCODER_H
 
 #include <Arduino.h>
-#include <EncButton.h>
+#include <GyverEncoder.h>
 #include "config.h"
 
 class EncoderModule {
 private:
-  EncButton<EB_TICK, ENCODER_DT, ENCODER_CLK, ENCODER_SW> enc;
+  Encoder enc;
   
 public:
-  EncoderModule() {}
+  EncoderModule() : enc(ENCODER_CLK, ENCODER_DT, ENCODER_SW) {}
 
   // Инициализация энкодера
   void begin() {
-    enc.setEncType(EB_STEP4_LOW);  // Тип энкодера (активный низкий сигнал)
+    enc.setType(TYPE2);  // Тип энкодера (TYPE1 или TYPE2 в зависимости от модели)
   }
 
   // Опрос энкодера (вызывать в loop)
@@ -30,55 +29,78 @@ public:
 
   // Получение изменения позиции (-1, 0, +1)
   int8_t getDelta() {
-    if (enc.turn()) {
-      return enc.dir();
+    if (enc.isRight()) {
+      return 1;
+    }
+    if (enc.isLeft()) {
+      return -1;
     }
     return 0;
   }
 
   // Проверка короткого нажатия
   bool isClick() {
-    return enc.click();
+    return enc.isClick();
   }
 
   // Проверка двойного клика
   bool isDouble() {
-    return enc.hasClicks(2);
+    return enc.isDouble();
   }
 
-  // Проверка длинного нажатия
+  // Проверка длинного нажатия (удержание)
   bool isLongPress() {
-    return enc.hold();
+    return enc.isHolded();
   }
 
-  // Очистка флага длинного нажатия (не требуется с EncButton)
+  // Очистка флага длинного нажатия (не требуется с GyverEncoder)
   void clearLongPress() {
-    // EncButton автоматически сбрасывает флаги
+    // GyverEncoder автоматически сбрасывает флаги
   }
 
   // Проверка быстрого вращения
   bool isFastRotate() {
-    return enc.fast();
+    return enc.isFast();
   }
 
-  // Проверка нажатого вращения
-  bool isTurnH() {
-    return enc.turnH();
+  // Проверка нажатого вращения вправо
+  bool isTurnRightH() {
+    return enc.isRightH();
   }
 
-  // Сброс позиции (не применимо к EncButton)
+  // Проверка нажатого вращения влево
+  bool isTurnLeftH() {
+    return enc.isLeftH();
+  }
+
+  // Проверка вращения в любую сторону
+  bool isTurn() {
+    return enc.isTurn();
+  }
+
+  // Сброс позиции (не применимо к GyverEncoder)
   void resetPosition() {
-    // EncButton не хранит абсолютную позицию
+    // GyverEncoder не хранит абсолютную позицию
   }
 
   // Получение нажатия кнопки (состояние)
   bool isPressed() {
-    return enc.pressing();
+    return enc.isHold();
   }
 
-  // Проверка одиночного клика
+  // Проверка одиночного клика (с таймаутом для двойного)
   bool isSingle() {
-    return enc.click();
+    return enc.isSingle();
+  }
+
+  // Проверка отпускания кнопки
+  bool isRelease() {
+    return enc.isRelease();
+  }
+
+  // Проверка нажатия (с дебаунсом)
+  bool isPress() {
+    return enc.isPress();
   }
 };
 
