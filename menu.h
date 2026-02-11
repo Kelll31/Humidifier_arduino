@@ -1,7 +1,7 @@
 /*
  * МОДУЛЬ МЕНЮ
  * Навигация и настройка параметров
- * ИСПРАВЛЕНО: правильные координаты для текста
+ * ИСПРАВЛЕНО v2: используем setCursorXY с пиксельными координатами
  */
 
 #ifndef MENU_H
@@ -425,14 +425,14 @@ public:
     drawMenuScreen();
   }
 
-  // Отрисовка экрана меню - ИСПРАВЛЕНО
+  // Отрисовка экрана меню - ИСПРАВЛЕНО: используем setCursorXY
   void drawMenuScreen()
   {
     display->clear();
 
     // Заголовок - используем setCursorXY с пиксельными координатами
     display->setScale(1);
-    display->setCursor(5, 0); // x=5 символов, y=0 строка
+    display->setCursorXY(30, 0);  // x=30 пикселей, y=0 пикселей
     display->print(F("МЕНЮ"));
     display->drawLine(0, 10, 127, 10);
 
@@ -451,44 +451,40 @@ public:
       if (itemIndex > MENU_EXIT)
         break;
 
-      uint8_t yRow = 2 + i; // Текстовая строка (строка 2, 3, 4, 5, 6)
+      uint8_t yPixel = 16 + (i * 10);  // Пиксельные координаты: 16, 26, 36, 46, 56
 
       // Стрелка "> " для текущего пункта
       if (itemIndex == currentItem)
       {
-        display->setCursor(0, yRow);
+        display->setCursorXY(0, yPixel);
         display->print(F(">"));
       }
 
       // Текст пункта
-      display->setCursor(2, yRow); // x=2 символа (отступ от стрелки)
+      display->setCursorXY(12, yPixel);  // x=12 пикселей (отступ от стрелки)
       display->print(menuItems[itemIndex]);
     }
-
-    // Подсказка
-    display->setCursor(0, 7); // Строка 7 (последняя)
-    display->print(F("ДН-выб ДЛ-выход"));
 
     display->update();
   }
 
-  // Отрисовка экрана редактирования - ИСПРАВЛЕНО
+  // Отрисовка экрана редактирования - ИСПРАВЛЕНО: используем setCursorXY
   void drawEditScreen()
   {
     display->clear();
 
     display->setScale(1);
-    display->setCursor(2, 0); // x=2 символа, y=0 строка
+    display->setCursorXY(15, 0);  // x=15 пикселей, y=0 пикселей
     display->print(F("НАСТРОЙКА"));
     display->drawLine(0, 10, 127, 10);
 
     // Название параметра
-    display->setCursor(0, 2); // Строка 2
+    display->setCursorXY(0, 16);  // y=16 пикселей
     display->print(menuItems[currentItem]);
 
     // Значение - большой шрифт
     display->setScale(3);
-    display->setCursor(4, 3); // Центрируем, строка 3
+    display->setCursorXY(30, 26);  // y=26 пикселей, центрируем
     display->print(editValue);
 
     display->setScale(1);
@@ -496,12 +492,12 @@ public:
     // Единицы измерения
     if (currentItem <= MENU_HYSTERESIS)
     {
-      display->setCursor(12, 5); // Строка 5
+      display->setCursorXY(80, 40);  // y=40 пикселей
       display->print(F("%"));
     }
 
     // Подсказка
-    display->setCursor(0, 7); // Строка 7
+    display->setCursorXY(0, 56);  // y=56 пикселей (последняя строка)
     display->print(F("ДН-OK ДЛ-отмена"));
 
     display->update();
