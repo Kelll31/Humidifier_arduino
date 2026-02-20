@@ -1,5 +1,9 @@
 /*
+<<<<<<< Updated upstream
  * УВЛАЖНИТЕЛЬ v2.2
+=======
+ * УВЛАЖНИТЕЛЬ v1.9
+>>>>>>> Stashed changes
  */
 
 #include "config.h"
@@ -26,39 +30,58 @@ unsigned long lastDisplayUpdate = 0;
 bool displayNeedsUpdate = false;
 
 void setup() {
+  // Сначала Serial для отладки
+  Serial.begin(115200);
+  Serial.println("=== Humidifier v1.9 ===");
+  
   wdt_disable();
+  Serial.println("1. Watchdog disabled");
   
   // Сначала инициализируем датчик DHT22
   sensor.begin();
+  Serial.println("2. Sensor begin");
   
   // Затем загружаем настройки
   storage.begin();
+  Serial.println("3. Storage begin");
   
   // Передаем storage датчику после загрузки
   sensor.setStorage(&storage);
+  Serial.println("4. Storage linked to sensor");
   
   // Дисплей
   display.begin();
+  Serial.println("5. Display begin");
+  
   display.showSplash();
+  Serial.println("6. Splash shown");
   delay(1500);
+  Serial.println("7. Delay done");
   
   // Аналитика
   analytics.begin();
+  Serial.println("8. Analytics begin");
   
   // Энкодер
   encoder.begin();
+  Serial.println("9. Encoder begin");
   
   // Увлажнитель
   humidifier.begin();
   humidifier.setStorage(&storage);
+  Serial.println("10. Humidifier begin");
   
   // Меню
   menu.begin(&display, &encoder, &storage, &sensor, &humidifier);
   menu.setAnalytics(&analytics);
+  Serial.println("11. Menu begin");
   
   wdt_enable(WDTO_4S);
+  Serial.println("12. Watchdog enabled");
+  
   lastEncoderActivity = millis();
   lastDisplayUpdate = millis();
+  Serial.println("=== SETUP COMPLETE ===");
 }
 
 void loop() {
@@ -79,10 +102,16 @@ void loop() {
   // Обновление данных
   if (millis() - lastUpdateTime >= UPDATE_INTERVAL) {
     lastUpdateTime = millis();
-    sensor.update();
+    
+    Serial.print("Update - DHT22: ");
+    bool sensorOK = sensor.update();
+    Serial.println(sensorOK ? "OK" : "FAIL");
     
     float temp = sensor.getTemperature();
     float hum = sensor.getHumidity();
+    Serial.print("Temp: "); Serial.print(temp);
+    Serial.print(" Hum: "); Serial.println(hum);
+    
     bool running = humidifier.isRunning();
 
     bool waterOK = true;
@@ -119,6 +148,7 @@ void loop() {
 
   // Двойной клик - вход/выход из меню
   if (encoder.isDouble()) {
+    Serial.println("DOUBLE CLICK");
     if (menu.isActive()) {
       menu.close();
     } else {
@@ -133,6 +163,7 @@ void loop() {
   } else {
     // Главный экран - переключение экранов только при вращении вправо
     if (encoder.isRight()) {
+      Serial.println("RIGHT");
       if (display.getMode() == MODE_GRAPH) {
         display.toggleGraphScreen();
       } else {
@@ -177,6 +208,7 @@ void loop() {
         waterRawValue
       );
       displayNeedsUpdate = false;
+      Serial.println("Screen updated");
     }
   }
 
