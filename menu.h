@@ -278,7 +278,13 @@ public:
 
     if (encoder->isLongPress()) {
       encoder->clearLongPress();
-      if (waterCalMode) {
+      if (calibrationMode) {
+        // При длинном нажатии в режиме калибровки - сохраняем и выходим
+        storage->setTempCalibration(tempCalValue);
+        storage->setHumCalibration(humCalValue);
+        storage->save();
+        calibrationMode = false;
+      } else if (waterCalMode) {
         // При длинном нажатии устанавливаем порог = текущий уровень воды
         if (analytics) {
           waterThreshold = analytics->getWaterRawValue();
