@@ -2,7 +2,7 @@
  * МОДУЛЬ ДИСПЛЕЯ OLED 128x64
  * Использует библиотеку GyverOLED (режим без буфера)
  * Поддержка русского языка
- * v2.1 - с экраном ручного режима
+ * v2.2 - исправление черного экрана
  */
 
 #ifndef DISPLAY_H
@@ -30,12 +30,12 @@ enum GraphScreen
 
 #define GRAPH_POINTS 32
 
-// Используем GyverOLED без буфера (SSD1306 128x64, I2C)
-GyverOLED<SSD1306_128x64, OLED_NO_BUFFER, OLED_I2C> oled;
-
 class Display
 {
 private:
+  // OLED объект как член класса (предотвращает multiple definition)
+  GyverOLED<SSD1306_128x64, OLED_NO_BUFFER, OLED_I2C> oled;
+  
   int cursorX, cursorY;
   uint8_t textScale;
   bool invert;
@@ -76,8 +76,21 @@ public:
 
   void begin()
   {
-    oled.init();
+    // Инициализация I2C шины
+    Wire.begin();
+    Wire.setClock(400000L); // 400 kHz Fast Mode
+    
+    // Задержка для стабилизации I2C
+    delay(100);
+    
+    // Инициализация OLED
+    oled.init(OLED_ADDRESS);
+    delay(50);
+    
     oled.clear();
+    oled.update();
+    delay(50);
+    
     setBrightness(BRIGHTNESS_FULL);
   }
 
@@ -126,13 +139,17 @@ public:
     oled.setCursor(cursorX, cursorY);
     oled.setScale(2);
     oled.print("УВЛАЖНИТЕЛЬ");
+    oled.update();
+    delay(1000);
+    
     cursorX = 30;
     cursorY = 48;
     oled.setCursor(cursorX, cursorY);
     oled.setScale(1);
     oled.print("v");
     oled.print(FIRMWARE_VERSION);
-    delay(1500);
+    oled.update();
+    delay(500);
   }
 
   void addGraphPoint(float humidity, bool running)
@@ -626,7 +643,7 @@ public:
 
   void invertRect(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1)
   {
-    oled.rect(x0, y0, x1, y1, OLED_FILL);
+  oled.rect(x0, y0, x1, y1, OLED_FILL);
   }
 };
 
