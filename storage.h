@@ -68,11 +68,8 @@ public:
     // Загрузка общего количества переключений
     EEPROM.get(EEPROM_TOTAL_SWITCHES_ADDR, totalSwitches);
 
-    // Загрузка порога датчика воды
-    uint8_t waterThreshByte = EEPROM.read(EEPROM_WATER_THRESHOLD_ADDR);
-    if (waterThreshByte >= 30 && waterThreshByte <= 900) {
-      waterThreshold = waterThreshByte;
-    }
+    // Загрузка порога датчика воды (uint16_t = 2 байта)
+    EEPROM.get(EEPROM_WATER_THRESHOLD_ADDR, waterThreshold);
 
     // Валидация значений
     validateSettings();
@@ -121,7 +118,7 @@ public:
     EEPROM.put(EEPROM_HUM_CAL_ADDR, humCalibration);
     EEPROM.put(EEPROM_WORK_TIME_ADDR, workTime);
     EEPROM.put(EEPROM_TOTAL_SWITCHES_ADDR, totalSwitches);
-    EEPROM.write(EEPROM_WATER_THRESHOLD_ADDR, (uint8_t)waterThreshold);
+    EEPROM.put(EEPROM_WATER_THRESHOLD_ADDR, waterThreshold);
 
     needsSave = false;
     lastSaveTime = millis();
