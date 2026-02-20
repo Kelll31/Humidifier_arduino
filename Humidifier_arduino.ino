@@ -1,20 +1,5 @@
 /*
- * АВТОМАТИЧЕСКИЙ УВЛАЖНИТЕЛЬ v1.7.3
- * 
- * v1.7.3:
- * - Добавлена возможность отключения датчика воды
- * - Исправлена проблема с перезагрузкой при старте
- * 
- * v1.7.2:
- * - 2 режима главного экрана
- * 
- * v1.7:
- * - Датчик уровня воды
- * - Детектор открытого окна
- * - Расширенная статистика
- * - Адаптивное обучение
- * 
- * Автор: kelll31 | 2026-02-12
+ * УВЛАЖНИТЕЛЬ v1.9
  */
 
 #include "config.h"
@@ -37,120 +22,139 @@ Analytics analytics;
 unsigned long lastUpdateTime = 0;
 unsigned long lastSaveTime = 0;
 unsigned long lastEncoderActivity = 0;
-unsigned long lastLearningUpdate = 0;
-bool dataUpdated = false;
+unsigned long lastDisplayUpdate = 0;
+bool displayNeedsUpdate = false;
 
 void setup() {
-  // Отключаем watchdog на время инициализации
   wdt_disable();
   
+  // Сначала инициализируем датчик DHT22
+  sensor.begin();
+  
+  // Затем загружаем настройки
   storage.begin();
   
+  // Передаем storage датчику после загрузки
+  sensor.setStorage(&storage);
+  
+  // Дисплей
   display.begin();
   display.showSplash();
   delay(1500);
   
+  // Аналитика
   analytics.begin();
   
-  sensor.begin();
-  sensor.setStorage(&storage);
+  // Энкодер
   encoder.begin();
+  
+  // Увлажнитель
   humidifier.begin();
   humidifier.setStorage(&storage);
+  
+  // Меню
   menu.begin(&display, &encoder, &storage, &sensor, &humidifier);
+  menu.setAnalytics(&analytics);
   
-  // Включаем watchdog после инициализации
   wdt_enable(WDTO_4S);
-  
   lastEncoderActivity = millis();
-  lastLearningUpdate = millis();
+  lastDisplayUpdate = millis();
 }
 
 void loop() {
   wdt_reset();
   encoder.tick();
   
-  if (encoder.isTurn() || encoder.isPress()) {
+  // Яркость
+  if (encoder.isPress()) {
     lastEncoderActivity = millis();
-    if (display.getBrightness() != BRIGHTNESS_FULL) {
-      display.setBrightness(BRIGHTNESS_FULL);
-    }
+    display.setBrightness(BRIGHTNESS_FULL);
   }
-
   unsigned long inactiveTime = millis() - lastEncoderActivity;
-  if (inactiveTime >= DIM_TIMEOUT_2) {
-    if (display.getBrightness() != BRIGHTNESS_DIM2) display.setBrightness(BRIGHTNESS_DIM2);
-  } else if (inactiveTime >= DIM_TIMEOUT_1) {
-    if (display.getBrightness() != BRIGHTNESS_DIM1) display.setBrightness(BRIGHTNESS_DIM1);
-  }
+  if (inactiveTime >= DIM_TIMEOUT_2) display.setBrightness(BRIGHTNESS_DIM2);
+  else if (inactiveTime >= DIM_TIMEOUT_1) display.setBrightness(BRIGHTNESS_DIM1);
 
   storage.tick();
 
+  // Обновление данных
   if (millis() - lastUpdateTime >= UPDATE_INTERVAL) {
     lastUpdateTime = millis();
+    sensor.update();
+    
+    float temp = sensor.getTemperature();
+    float hum = sensor.getHumidity();
+    bool running = humidifier.isRunning();
 
-    if (sensor.update()) {
-      float temp = sensor.getTemperature();
-      float hum = sensor.getHumidity();
-      bool running = humidifier.isRunning();
+    bool waterOK = true;
+    bool windowOpen = false;
+    
+    #if WATER_SENSOR_ENABLED
+      waterOK = analytics.checkWaterLevel();
+    #endif
+    
+    #if WINDOW_DETECTOR_ENABLED
+      analytics.updateWindowDetector(temp);
+      windowOpen = analytics.isWindowOpen();
+    #endif
 
-      #if WATER_SENSOR_ENABLED
-        bool waterOK = analytics.checkWaterLevel();
-      #else
-        bool waterOK = true;
-      #endif
-      
-      #if WINDOW_DETECTOR_ENABLED
-        analytics.updateWindowDetector(temp);
-        bool windowOpen = analytics.isWindowOpen();
-      #else
-        bool windowOpen = false;
-      #endif
+    display.addGraphPoint(hum, running);
+    
+    #if STATS_ENABLED
+      analytics.addSample(temp, hum, running);
+    #endif
 
-      display.addGraphPoint(hum, running);
-      
-      #if STATS_ENABLED
-        analytics.addSample(temp, hum, running);
-      #endif
-
-      if (waterOK && !windowOpen) {
-        humidifier.control(hum, storage.getMinHumidity(), storage.getMaxHumidity(), sensor.isOK());
-      } else {
-        humidifier.stop();
-      }
-
-      if (humidifier.isRunning()) {
-        storage.incrementWorkTime(UPDATE_INTERVAL / 1000);
-      }
-
-      dataUpdated = true;
+    if (waterOK && !windowOpen) {
+      humidifier.control(hum, storage.getMinHumidity(), storage.getMaxHumidity(), sensor.isOK());
     } else {
-      humidifier.blinkError();
-      dataUpdated = true;
+      humidifier.stop();
+    }
+
+    if (humidifier.isRunning()) {
+      storage.incrementWorkTime(UPDATE_INTERVAL / 1000);
+    }
+    
+    // Данные обновились - нужно перерисовать экран
+    displayNeedsUpdate = true;
+  }
+
+  // Двойной клик - вход/выход из меню
+  if (encoder.isDouble()) {
+    if (menu.isActive()) {
+      menu.close();
+    } else {
+      menu.open();
     }
   }
-  
-  #if LEARNING_ENABLED && STATS_ENABLED
-    if (millis() - lastLearningUpdate >= 3600000UL) {
-      lastLearningUpdate = millis();
-      analytics.updateLearning();
-    }
-  #endif
 
+  // Меню
   if (menu.isActive()) {
     menu.tick();
     menu.draw();
   } else {
-    if (encoder.isRight() || encoder.isLeft()) {
-      display.toggleMode();
-      dataUpdated = true;
+    // Главный экран - переключение экранов только при вращении вправо
+    if (encoder.isRight()) {
+      if (display.getMode() == MODE_GRAPH) {
+        display.toggleGraphScreen();
+      } else {
+        display.toggleMode();
+      }
+      displayNeedsUpdate = true;
     }
     
-    if (dataUpdated) {
+    // Обновляем экран только если нужно
+    if (displayNeedsUpdate && millis() - lastDisplayUpdate >= 500) {
+      lastDisplayUpdate = millis();
+      
       #if WATER_SENSOR_ENABLED
         bool waterLow = analytics.isWaterLow();
+        bool waterSensorPresent = analytics.isWaterSensorPresent();
+        uint8_t waterPercent = analytics.getWaterPercent();
+        int waterRawValue = analytics.getWaterRawValue();
       #else
         bool waterLow = false;
+        bool waterSensorPresent = false;
+        uint8_t waterPercent = 0;
+        int waterRawValue = 0;
       #endif
       
       #if WINDOW_DETECTOR_ENABLED
@@ -167,22 +171,17 @@ void loop() {
         storage.getWorkTime(),
         sensor.isOK(),
         waterLow,
-        windowOpen
+        windowOpen,
+        waterSensorPresent,
+        waterPercent,
+        waterRawValue
       );
-      dataUpdated = false;
-    }
-    
-    if (encoder.isLongPress()) {
-      encoder.clearLongPress();
-      menu.open();
+      displayNeedsUpdate = false;
     }
   }
 
   if (millis() - lastSaveTime >= AUTOSAVE_INTERVAL) {
     lastSaveTime = millis();
-    #if STATS_ENABLED
-      analytics.saveHourlyStats();
-    #endif
     storage.saveDirect();
   }
 

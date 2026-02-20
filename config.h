@@ -1,6 +1,6 @@
 /*
- * КОНФИГУРАЦИЯ СИСТЕМЫ v1.7.5 - STABLE
- * Все пины, константы и настройки проекта
+ * КОНФИГУРАЦИЯ СИСТЕМЫ v1.8.1
+ * Оптимизировано для Arduino Nano
  */
 
 #ifndef CONFIG_H
@@ -13,119 +13,115 @@
 // ПИНЫ ПОДКЛЮЧЕНИЯ
 // ============================================================================
 
-// Датчик DHT22
-#define DHT_PIN           6       // D6 - DATA пин DHT22
-#define DHT_TYPE          DHT22   // Тип датчика
+#define DHT_PIN           6
+#define DHT_TYPE          DHT22
 
-// OLED дисплей I2C
-#define OLED_ADDRESS      0x3C    // I2C адрес дисплея
-// SDA - A4, SCL - A5 (аппаратный I2C)
+#define OLED_ADDRESS      0x3C
 
-// Энкодер
-#define ENCODER_CLK       2       // D2 - CLK (сигнал A)
-#define ENCODER_DT        3       // D3 - DT (сигнал B)
-#define ENCODER_SW        4       // D4 - SW (кнопка)
+#define ENCODER_CLK       2
+#define ENCODER_DT        3
+#define ENCODER_SW        4
 
-// Управление увлажнителем
-#define HUMIDIFIER_PIN    7       // D7 - управление MOSFET Gate
-// LED2 (красный) подключен параллельно к D7
+#define HUMIDIFIER_PIN    7
 
-// Датчик уровня воды (резистивный)
-#define WATER_SENSOR_ENABLED false // ВКЛЮЧИТЬ/ВЫКЛЮЧИТЬ датчик воды
-#define WATER_LEVEL_PIN   A0      // A0 - аналоговый пин для датчика воды
-#define WATER_THRESHOLD   300     // Порог низкого уровня воды (0-1023)
+// ============================================================================
+// ДАТЧИК УРОВНЯ ВОДЫ
+// ============================================================================
+
+#define WATER_SENSOR_ENABLED      true
+#define WATER_LEVEL_PIN           A0
+
+#define WATER_LEVEL_EMPTY         100
+#define WATER_LEVEL_LOW           250
+#define WATER_LEVEL_MEDIUM        400
+#define WATER_LEVEL_HIGH          550
+#define WATER_LEVEL_FULL          700
+
+#define WATER_THRESHOLD           WATER_LEVEL_LOW
+
+#define WATER_SENSOR_MIN         30
+#define WATER_SENSOR_MAX         900
 
 // ============================================================================
 // НАСТРОЙКИ ПО УМОЛЧАНИЮ
 // ============================================================================
 
-// Пороги влажности
-#define DEFAULT_MIN_HUMIDITY    40    // Минимальная влажность (%)
-#define DEFAULT_MAX_HUMIDITY    60    // Максимальная влажность (%)
-#define DEFAULT_HYSTERESIS      5     // Гистерезис (%)
+#define DEFAULT_MIN_HUMIDITY    40
+#define DEFAULT_MAX_HUMIDITY    60
+#define DEFAULT_HYSTERESIS      5
 
-// Временные интервалы
-#define UPDATE_INTERVAL         2000  // Интервал опроса датчика (мс)
-#define AUTOSAVE_INTERVAL       300000 // Автосохранение каждые 5 минут (мс)
-#define MIN_RUN_TIME            30000  // Минимальное время работы (мс)
-#define MIN_PAUSE_TIME          60000  // Минимальное время паузы (мс)
+#define UPDATE_INTERVAL         2000
+#define AUTOSAVE_INTERVAL       300000
+#define MIN_RUN_TIME            30000
+#define MIN_PAUSE_TIME          60000
 
-// Защита от частых переключений
-#define MAX_SWITCHES_PER_HOUR   10    // Максимум переключений в час
+#define MAX_SWITCHES_PER_HOUR   10
 
-// Калибровка датчика
-#define TEMP_CALIBRATION        0.0   // Коррекция температуры (°C)
-#define HUM_CALIBRATION         0.0   // Коррекция влажности (%)
+#define TEMP_CALIBRATION        0.0
+#define HUM_CALIBRATION         0.0
 
 // ============================================================================
 // ДЕТЕКТОР ОТКРЫТОГО ОКНА
 // ============================================================================
 
-#define WINDOW_DETECTOR_ENABLED true  // ВКЛЮЧИТЬ/ВЫКЛЮЧИТЬ детектор окна
-#define WINDOW_TEMP_DROP        2.0   // Падение температуры для детекции окна (°C)
-#define WINDOW_CHECK_INTERVAL   30000 // Интервал проверки окна (мс)
-#define WINDOW_TEMP_SAMPLES     3     // Количество проверок для подтверждения
+#define WINDOW_DETECTOR_ENABLED true
+#define WINDOW_TEMP_DROP        2.0
+#define WINDOW_CHECK_INTERVAL   30000
+#define WINDOW_TEMP_SAMPLES     3
 
 // ============================================================================
-// РАСШИРЕННАЯ СТАТИСТИКА
+// СТАТИСТИКА И ОБУЧЕНИЕ
 // ============================================================================
 
-#define STATS_ENABLED           true  // ВКЛЮЧИТЬ/ВЫКЛЮЧИТЬ статистику
-#define STATS_HISTORY_SIZE      24    // Часов истории (24 часа)
-#define STATS_SLOT_DURATION     3600  // Длительность слота в секундах (1 час)
+#define STATS_ENABLED           true
+#define STATS_HISTORY_SIZE      24
 
-// ============================================================================
-// АДАПТИВНОЕ ОБУЧЕНИЕ
-// ============================================================================
-
-#define LEARNING_ENABLED        true  // ВКЛЮЧИТЬ/ВЫКЛЮЧИТЬ адаптивное обучение
-#define LEARNING_SAMPLES        168   // Неделя данных (168 часов)
-#define LEARNING_MIN_DATA       24    // Минимум данных для обучения (часов)
-#define LEARNING_ADJUSTMENT     0.5   // Коэффициент корректировки (0.1-1.0)
+#define LEARNING_ENABLED        true
+#define LEARNING_MIN_DATA       24
 
 // ============================================================================
 // НАСТРОЙКИ ДИСПЛЕЯ
 // ============================================================================
 
-#define SCREEN_WIDTH            128   // Ширина дисплея в пикселях
-#define SCREEN_HEIGHT           64    // Высота дисплея в пикселях
-#define SCREEN_TIMEOUT          30000 // Таймаут гашения экрана (мс)
+#define SCREEN_WIDTH            128
+#define SCREEN_HEIGHT           64
+#define SCREEN_TIMEOUT          30000
 
-// Автоматическое затемнение дисплея
-#define BRIGHTNESS_FULL         255   // 100% яркость
-#define BRIGHTNESS_DIM1         191   // 75% яркость
-#define BRIGHTNESS_DIM2         51    // 20% яркость
-#define DIM_TIMEOUT_1           10000 // 10 секунд до первого затемнения (мс)
-#define DIM_TIMEOUT_2           180000 // 3 минуты до второго затемнения (мс)
+#define BRIGHTNESS_FULL         255
+#define BRIGHTNESS_DIM1         191
+#define BRIGHTNESS_DIM2         51
+#define DIM_TIMEOUT_1           10000
+#define DIM_TIMEOUT_2           180000
 
 // ============================================================================
 // НАСТРОЙКИ МЕНЮ
 // ============================================================================
 
-#define MENU_ITEMS              8     // Количество пунктов меню
-#define LONG_PRESS_TIME         2000  // Длинное нажатие (мс)
-#define ENCODER_FAST_THRESHOLD  50    // Порог быстрого вращения (мс)
+#define MENU_ITEMS              8
+#define LONG_PRESS_TIME         2000
+#define ENCODER_FAST_THRESHOLD  50
 
 // ============================================================================
 // АДРЕСА EEPROM
 // ============================================================================
 
-#define EEPROM_MAGIC_ADDR          0     // Адрес магического числа
-#define EEPROM_MAGIC_VALUE         0xAC  // Магическое число v1.7
-#define EEPROM_MIN_HUM_ADDR        1     // Адрес минимальной влажности
-#define EEPROM_MAX_HUM_ADDR        2     // Адрес максимальной влажности
-#define EEPROM_HYSTERESIS_ADDR     3     // Адрес гистерезиса
-#define EEPROM_TEMP_CAL_ADDR       4     // Адрес калибровки температуры (4 байта float)
-#define EEPROM_HUM_CAL_ADDR        8     // Адрес калибровки влажности (4 байта float)
-#define EEPROM_WORK_TIME_ADDR      12    // Адрес времени работы (4 байта unsigned long)
-#define EEPROM_TOTAL_SWITCHES_ADDR 16    // Адрес общего счетчика переключений (4 байта)
-#define EEPROM_LEARNING_ADDR       20    // Адрес данных обучения (начало блока)
-#define EEPROM_STATS_ADDR          200   // Адрес статистики (начало блока)
+#define EEPROM_MAGIC_ADDR          0
+#define EEPROM_MAGIC_VALUE         0xAE
+#define EEPROM_MIN_HUM_ADDR        1
+#define EEPROM_MAX_HUM_ADDR        2
+#define EEPROM_HYSTERESIS_ADDR     3
+#define EEPROM_TEMP_CAL_ADDR       4
+#define EEPROM_HUM_CAL_ADDR        8
+#define EEPROM_WORK_TIME_ADDR      12
+#define EEPROM_TOTAL_SWITCHES_ADDR 16
+#define EEPROM_WATER_THRESHOLD_ADDR 20
+#define EEPROM_LEARNING_ADDR       22
+#define EEPROM_STATS_ADDR          200
 
 // ============================================================================
 // СИСТЕМНЫЕ КОНСТАНТЫ
 // ============================================================================
 
-#define FIRMWARE_VERSION        "1.7.5"
+#define FIRMWARE_VERSION        "1.8.1"
 
 #endif // CONFIG_H

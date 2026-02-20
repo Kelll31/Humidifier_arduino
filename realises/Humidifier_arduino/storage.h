@@ -1,5 +1,5 @@
 /*
- * МОДУЛЬ ХРАНИНИЛИЩА НАСТРОЕК
+ * МОДУЛЬ ХРАНИЛИЩА НАСТРОЕК
  * Работа с EEPROM для сохранения параметров
  */
 
@@ -19,7 +19,6 @@ private:
   float humCalibration;
   unsigned long workTime; // Время работы в секундах
   unsigned long totalSwitches; // Общее количество переключений
-  uint16_t waterThreshold; // Порог датчика воды
   
   // Защита от износа EEPROM
   bool needsSave;
@@ -33,7 +32,6 @@ public:
               humCalibration(HUM_CALIBRATION),
               workTime(0),
               totalSwitches(0),
-              waterThreshold(WATER_THRESHOLD),
               needsSave(false),
               lastSaveTime(0) {}
 
@@ -68,12 +66,6 @@ public:
     // Загрузка общего количества переключений
     EEPROM.get(EEPROM_TOTAL_SWITCHES_ADDR, totalSwitches);
 
-    // Загрузка порога датчика воды
-    uint8_t waterThreshByte = EEPROM.read(EEPROM_WATER_THRESHOLD_ADDR);
-    if (waterThreshByte >= 30 && waterThreshByte <= 900) {
-      waterThreshold = waterThreshByte;
-    }
-
     // Валидация значений
     validateSettings();
   }
@@ -100,9 +92,6 @@ public:
     // Проверка времени работы (не должно быть слишком большим)
     if (workTime > 0xFFFFFFF) workTime = 0; // Сброс при невалидных значениях
     if (totalSwitches > 0xFFFFFFF) totalSwitches = 0;
-    
-    // Проверка порога воды
-    if (waterThreshold < 30 || waterThreshold > 900) waterThreshold = WATER_THRESHOLD;
   }
 
   // Сохранение настроек в EEPROM (с задержкой)
@@ -121,7 +110,6 @@ public:
     EEPROM.put(EEPROM_HUM_CAL_ADDR, humCalibration);
     EEPROM.put(EEPROM_WORK_TIME_ADDR, workTime);
     EEPROM.put(EEPROM_TOTAL_SWITCHES_ADDR, totalSwitches);
-    EEPROM.write(EEPROM_WATER_THRESHOLD_ADDR, (uint8_t)waterThreshold);
 
     needsSave = false;
     lastSaveTime = millis();
@@ -144,7 +132,6 @@ public:
     humCalibration = HUM_CALIBRATION;
     workTime = 0;
     totalSwitches = 0;
-    waterThreshold = WATER_THRESHOLD;
   }
 
   // Сброс всех настроек
@@ -161,7 +148,6 @@ public:
   float getHumCalibration() const { return humCalibration; }
   unsigned long getWorkTime() const { return workTime; }
   unsigned long getTotalSwitches() const { return totalSwitches; }
-  uint16_t getWaterThreshold() const { return waterThreshold; }
 
   // Сеттеры
   void setMinHumidity(uint8_t value) {
@@ -200,14 +186,6 @@ public:
     float newValue = constrain(value, -20.0, 20.0);
     if (abs(newValue - humCalibration) > 0.01) {
       humCalibration = newValue;
-      save();
-    }
-  }
-
-  void setWaterThreshold(uint16_t value) {
-    uint16_t newValue = constrain(value, 30, 900);
-    if (newValue != waterThreshold) {
-      waterThreshold = newValue;
       save();
     }
   }

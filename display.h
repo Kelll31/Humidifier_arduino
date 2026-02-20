@@ -1,253 +1,327 @@
 /*
- * МОДУЛЬ ДИСПЛЕЯ OLED 128x64 v1.7.6
- * ИСПРАВЛЕНО: на основе рабочей версии 1.6
+ * МОДУЛЬ ДИСПЛЕЯ OLED 128x64
+ * Использует библиотеку GyverOLED (режим без буфера)
+ * Поддержка русского языка
+ * v2.1 - с экраном ручного режима
  */
 
 #ifndef DISPLAY_H
 #define DISPLAY_H
 
 #include <Arduino.h>
-#include <GyverOLED.h>
+#include <Wire.h>
 #include "config.h"
 
-GyverOLED<SSD1306_128x64, OLED_BUFFER> oled;
+// Подключаем GyverOLED напрямую из локальной библиотеки
+#include <GyverOLED.h>
 
-#define GRAPH_POINTS 32
-
-enum DisplayMode {
+enum DisplayMode
+{
   MODE_DATA = 0,
   MODE_GRAPH = 1
 };
 
-class Display {
+// Экраны внутри режима графика
+enum GraphScreen
+{
+  GRAPH_SCREEN_GRAPH = 0,
+  GRAPH_SCREEN_STATS = 1
+};
+
+#define GRAPH_POINTS 32
+
+// Используем GyverOLED без буфера (SSD1306 128x64, I2C)
+GyverOLED<SSD1306_128x64, OLED_NO_BUFFER, OLED_I2C> oled;
+
+class Display
+{
 private:
-  float lastTemp;
-  float lastHum;
+  int cursorX, cursorY;
+  uint8_t textScale;
+  bool invert;
+
+  float lastTemp, lastHum;
   uint8_t lastTargetHum;
   bool lastRunning;
   unsigned long lastWorkTime;
   bool lastSensorOK;
   bool lastWaterLow;
-  bool lastWindowOpen;
-  DisplayMode lastMode;
   bool firstDraw;
-  
+  int lastWaterValue;
+  bool lastWaterPresent;
+
   uint8_t currentBrightness;
   DisplayMode currentMode;
+  uint8_t graphScreen; // 0 = график, 1 = статистика
 
   uint8_t humGraph[GRAPH_POINTS];
   uint32_t humState;
   uint8_t gIdx;
   bool gFull;
 
+  uint8_t lastChar;
+
 public:
-  Display() : lastTemp(-999), lastHum(-999), lastTargetHum(0),
+  Display() : cursorX(0), cursorY(0), textScale(1), invert(false),
+              lastTemp(-999), lastHum(-999), lastTargetHum(0),
               lastRunning(false), lastWorkTime(0), lastSensorOK(true),
-              lastWaterLow(false), lastWindowOpen(false),
-              lastMode(MODE_DATA), firstDraw(true),
-              currentBrightness(BRIGHTNESS_FULL), currentMode(MODE_DATA),
-              gIdx(0), gFull(false), humState(0) {
+              lastWaterLow(false), firstDraw(true), lastWaterValue(0),
+              lastWaterPresent(false), currentBrightness(BRIGHTNESS_FULL),
+              currentMode(MODE_DATA), graphScreen(GRAPH_SCREEN_GRAPH),
+              gIdx(0), gFull(false), humState(0),
+              lastChar(0)
+  {
     memset(humGraph, 0, sizeof(humGraph));
   }
 
-  void begin() {
+  void begin()
+  {
     oled.init();
     oled.clear();
-    oled.sendCommand(0xD5);
-    oled.sendCommand(0xF0);
     setBrightness(BRIGHTNESS_FULL);
   }
 
-  void setBrightness(uint8_t brightness) {
-    if (currentBrightness != brightness) {
+  void setBrightness(uint8_t brightness)
+  {
+    if (currentBrightness != brightness)
+    {
       currentBrightness = brightness;
       oled.setContrast(brightness);
     }
   }
-  
-  uint8_t getBrightness() const {
-    return currentBrightness;
-  }
-  
-  void toggleMode() {
+
+  uint8_t getBrightness() const { return currentBrightness; }
+
+  void toggleMode()
+  {
     currentMode = (currentMode == MODE_DATA) ? MODE_GRAPH : MODE_DATA;
+    graphScreen = GRAPH_SCREEN_GRAPH; // Сбрасываем на первый экран
     firstDraw = true;
   }
-  
-  DisplayMode getMode() const {
-    return currentMode;
+
+  // Переключение между экранами внутри режима графика
+  void toggleGraphScreen()
+  {
+    graphScreen = (graphScreen == GRAPH_SCREEN_GRAPH) ? GRAPH_SCREEN_STATS : GRAPH_SCREEN_GRAPH;
+    firstDraw = true;
   }
 
-  void showSplash() {
+  uint8_t getGraphScreen() const { return graphScreen; }
+
+  DisplayMode getMode() const { return currentMode; }
+
+  void invertText(bool inv)
+  {
+    invert = inv;
+    oled.invertText(inv);
+  }
+
+  void textMode(byte m) { oled.textMode(m); }
+
+  void showSplash()
+  {
     oled.clear();
+    cursorX = 0;
+    cursorY = 16;
+    oled.setCursor(cursorX, cursorY);
     oled.setScale(2);
-    oled.setCursor(0, 2);  // СТРОКА 2 (символьные координаты!)
-    oled.print(F("УВЛАЖНИТЕЛЬ"));
+    oled.print("УВЛАЖНИТЕЛЬ");
+    cursorX = 30;
+    cursorY = 48;
+    oled.setCursor(cursorX, cursorY);
     oled.setScale(1);
-    oled.setCursor(30, 6);  // СТРОКА 6 (символьные координаты!)
-    oled.print(F("v"));
+    oled.print("v");
     oled.print(FIRMWARE_VERSION);
-    oled.update();
+    delay(1500);
   }
 
-  void addGraphPoint(float humidity, bool running) {
+  void addGraphPoint(float humidity, bool running)
+  {
     uint8_t val = (uint8_t)constrain(humidity, 0, 100);
     humGraph[gIdx] = val;
-    if (running) humState |=  ((uint32_t)1 << gIdx);
-    else         humState &= ~((uint32_t)1 << gIdx);
+    if (running)
+      humState |= ((uint32_t)1 << gIdx);
+    else
+      humState &= ~((uint32_t)1 << gIdx);
     gIdx++;
-    if (gIdx >= GRAPH_POINTS) {
+    if (gIdx >= GRAPH_POINTS)
+    {
       gIdx = 0;
       gFull = true;
     }
   }
 
-  void drawFullGraph() {
-    uint8_t cnt = gFull ? GRAPH_POINTS : gIdx;
-    
-    oled.line(0, 0, 127, 0);
-    oled.line(0, 63, 127, 63);
-    oled.line(0, 0, 0, 63);
-    oled.line(127, 0, 127, 63);
-    
-    if (cnt == 0) return;
+  void dot(int x, int y, byte fill = 1)
+  {
+    oled.dot(x, y, fill);
+  }
 
-    uint8_t lo = 100, hi = 0;
-    for (uint8_t i = 0; i < cnt; i++) {
+  void drawLine(int x0, int y0, int x1, int y1, byte fill = 1)
+  {
+    oled.line(x0, y0, x1, y1, fill);
+  }
+
+  void line(int x0, int y0, int x1, int y1, byte fill = 1)
+  {
+    oled.line(x0, y0, x1, y1, fill);
+  }
+
+  void fastLineH(int y, int x0, int x1, byte fill = 1)
+  {
+    oled.fastLineH(y, x0, x1, fill);
+  }
+
+  void fastLineV(int x, int y0, int y1, byte fill = 1)
+  {
+    oled.fastLineV(x, y0, y1, fill);
+  }
+
+  void drawGraph()
+  {
+    line(0, 20, 127, 20);
+    line(0, 63, 127, 63);
+    line(0, 20, 0, 63);
+    line(127, 20, 127, 63);
+
+    uint8_t cnt = gFull ? GRAPH_POINTS : gIdx;
+    if (cnt < 2)
+      return;
+
+    int16_t prevX = -1, prevY = -1;
+
+    for (uint8_t i = 0; i < cnt; i++)
+    {
       uint8_t idx = gFull ? ((gIdx + i) % GRAPH_POINTS) : i;
       uint8_t v = humGraph[idx];
-      if (v < lo) lo = v;
-      if (v > hi) hi = v;
-    }
 
-    if (hi - lo < 5) {
-      if (lo >= 3) lo -= 3; else lo = 0;
-      if (hi <= 97) hi += 3; else hi = 100;
-    }
-    if (hi == lo) hi = lo + 1;
+      uint8_t px = 126 - (uint16_t)(cnt - 1 - i) * 124 / (cnt - 1);
+      uint8_t py = 61 - (uint16_t)v * 40 / 100;
+      py = constrain(py, 22, 61);
 
+      if (prevX >= 0)
+        line(prevX, prevY, px, py);
+      dot(px, py);
+
+      if (humState & ((uint32_t)1 << idx))
+        dot(px, 61);
+
+      prevX = px;
+      prevY = py;
+    }
+  }
+
+  // Экран статистики
+  void drawStatsScreen(float temp, float hum, bool running, unsigned long workTime,
+                       bool waterLow, bool waterSensorPresent, uint8_t waterPercent)
+  {
+    oled.clear();
+    
+    // Заголовок
+    cursorX = 30;
+    cursorY = 0;
+    oled.setCursor(cursorX, cursorY);
     oled.setScale(1);
-    oled.setCursor(2, 3);  // СТРОКА 3
-    oled.print(hi);
-    oled.setCursor(2, 7);  // СТРОКА 7
-    oled.print(lo);
+    oled.print("СТАТИСТИКА");
+    line(0, 1, 127, 1);
 
-    int16_t prevPx = -1, prevPy = -1;
+    // Температура
+    cursorX = 0;
+    cursorY = 2;
+    oled.setCursor(cursorX, cursorY);
+    oled.print("T:");
+    if (temp >= -40 && temp <= 80)
+      oled.print((int)temp);
+    else
+      oled.print("--");
+    oled.print("C");
 
-    for (uint8_t i = 0; i < cnt; i++) {
-      uint8_t dataIdx = gFull ? ((gIdx + i) % GRAPH_POINTS) : i;
-      uint8_t v = humGraph[dataIdx];
+    // Влажность
+    cursorX = 60;
+    cursorY = 2;
+    oled.setCursor(cursorX, cursorY);
+    oled.print("H:");
+    if (hum >= 0 && hum <= 100)
+      oled.print((int)hum);
+    else
+      oled.print("--");
+    oled.print("%");
 
-      uint8_t px = 126 - (cnt == 1 ? 0 : (uint16_t)(cnt - 1 - i) * 124 / (cnt - 1));
-      uint8_t py = 61 - (uint16_t)(v - lo) * 59 / (hi - lo);
-      if (py < 2) py = 2;
-      if (py > 61) py = 61;
+    // Статус увлажнителя
+    cursorX = 0;
+    cursorY = 3;
+    oled.setCursor(cursorX, cursorY);
+    oled.print("Увлажнитель:");
+    if (running)
+      oled.print("ВКЛ");
+    else
+      oled.print("ВЫКЛ");
 
-      if (prevPx >= 0) {
-        oled.line(prevPx, prevPy, px, py);
-      }
-      oled.dot(px, py);
-
-      if (humState & ((uint32_t)1 << dataIdx)) {
-        oled.dot(px, 61);
-        oled.dot(px, 60);
-      }
-
-      prevPx = px;
-      prevPy = py;
+    // Время работы
+    cursorX = 0;
+    cursorY = 4;
+    oled.setCursor(cursorX, cursorY);
+    oled.print("Работа:");
+    if (workTime >= 3600) {
+      oled.print(workTime / 3600);
+      oled.print("ч");
     }
+    oled.print((workTime % 3600) / 60);
+    oled.print("м");
+
+    // Уровень воды
+    cursorX = 0;
+    cursorY = 5;
+    oled.setCursor(cursorX, cursorY);
+    oled.print("Вода:");
+    if (!waterSensorPresent)
+      oled.print("НЕТ");
+    else if (waterLow)
+      oled.print("НИЗКО!");
+    else {
+      oled.print(waterPercent);
+      oled.print("%");
+    }
+
+    // Подсказка
+    cursorX = 0;
+    cursorY = 7;
+    oled.setCursor(cursorX, cursorY);
+    oled.print("Поворот-выбор");
+
+    oled.update();
   }
 
   void drawMainScreen(float temp, float hum, uint8_t targetHum,
                       bool running, unsigned long workTime, bool sensorOK,
-                      bool waterLow = false, bool windowOpen = false) {
-    bool changed = false;
-    if (firstDraw) changed = true;
-    if (currentMode != lastMode) changed = true;
-    if (sensorOK != lastSensorOK) changed = true;
-    if (waterLow != lastWaterLow) changed = true;
-    if (windowOpen != lastWindowOpen) changed = true;
-    if (fabs(temp - lastTemp) >= 0.1) changed = true;
-    if (fabs(hum - lastHum) >= 0.1) changed = true;
-    if (targetHum != lastTargetHum) changed = true;
-    if (running != lastRunning) changed = true;
-    if ((workTime / 60) != (lastWorkTime / 60)) changed = true;
-
-    if (!changed) return;
-
-    oled.clear();
-
-    if (!sensorOK) {
-      oled.setScale(2);
-      oled.setCursor(15, 3);
-      oled.print(F("ОШИБКА"));
-      oled.setScale(1);
-      oled.setCursor(20, 6);
-      oled.print(F("DHT22"));
-      oled.update();
-      lastSensorOK = sensorOK;
-      firstDraw = false;
-      return;
+                      bool waterLow, bool windowOpen,
+                      bool waterSensorPresent, uint8_t waterPercent,
+                      int waterRawValue)
+  {
+    // Проверяем, нужно ли перерисовать
+    bool needRedraw = firstDraw;
+    
+    if (currentMode == MODE_GRAPH && graphScreen == GRAPH_SCREEN_STATS) {
+      // Для экрана статистики - всегда перерисовываем
+      needRedraw = true;
     }
+    
+    if (sensorOK != lastSensorOK) needRedraw = true;
+    if (waterLow != lastWaterLow) needRedraw = true;
+    if (fabs(temp - lastTemp) >= 0.5) needRedraw = true;
+    if (fabs(hum - lastHum) >= 1) needRedraw = true;
+    if (targetHum != lastTargetHum) needRedraw = true;
+    if (running != lastRunning) needRedraw = true;
 
-    if (currentMode == MODE_DATA) {
-      // РЕЖИМ ДАННЫХ - используем setCursorXY с пиксельными координатами
-      oled.setScale(1);
-      
-      oled.setCursorXY(0, 0);
-      oled.print(F("T:"));
-      if (temp >= -40 && temp <= 80) {
-        oled.print(temp, 1);
-      } else {
-        oled.print(F("--"));
-      }
-      oled.print(F("C"));
-      
-      oled.setCursorXY(0, 10);
-      oled.print(F("H:"));
-      if (hum >= 0 && hum <= 100) {
-        oled.print(hum, 1);
-      } else {
-        oled.print(F("--"));
-      }
-      oled.print(F("%"));
-      
-      oled.setCursorXY(0, 20);
-      oled.print(F("SET:"));
-      oled.print(targetHum);
-      oled.print(F("%"));
-      
-      oled.line(0, 32, 127, 32);
-      
-      oled.setCursorXY(0, 36);
-      if (waterLow) {
-        oled.print(F("НЕТ ВОДЫ!"));
-      } else if (windowOpen) {
-        oled.print(F("ОКНО ОТКР."));
-      } else if (running) {
-        oled.print(F("РАБОТАЕТ"));
-      } else {
-        oled.print(F("ОЖИДАНИЕ"));
-      }
-      
-      oled.setCursorXY(0, 48);
-      oled.print(F("Раб: "));
-      if (workTime >= 3600) {
-        oled.print(workTime / 3600);
-        oled.print(F("ч"));
-      }
-      oled.print((workTime % 3600) / 60);
-      oled.print(F("м"));
-      
-      oled.setCursorXY(0, 56);
-      oled.print(F("Вращ=Граф"));
-      
+    if (!needRedraw && !firstDraw) return;
+
+    // Если режим графика и экран статистики - рисуем статистику
+    if (currentMode == MODE_GRAPH && graphScreen == GRAPH_SCREEN_STATS) {
+      drawStatsScreen(temp, hum, running, workTime, waterLow, waterSensorPresent, waterPercent);
     } else {
-      oled.setScale(1);
-      drawFullGraph();
+      // Иначе рисуем основной экран или график
+      drawDataScreen(temp, hum, targetHum, running, workTime, sensorOK,
+                     waterLow, waterSensorPresent, waterPercent, waterRawValue);
     }
-
-    oled.update();
 
     lastTemp = temp;
     lastHum = hum;
@@ -256,105 +330,302 @@ public:
     lastWorkTime = workTime;
     lastSensorOK = sensorOK;
     lastWaterLow = waterLow;
-    lastWindowOpen = windowOpen;
-    lastMode = currentMode;
+    lastWaterPresent = waterSensorPresent;
+    lastWaterValue = waterRawValue;
     firstDraw = false;
   }
 
-  void drawAboutScreen(unsigned long workTime, uint8_t switchCount,
-                       unsigned long totalSwitches) {
+  // Основной экран с данными и графиком
+  void drawDataScreen(float temp, float hum, uint8_t targetHum,
+                      bool running, unsigned long workTime, bool sensorOK,
+                      bool waterLow, bool waterSensorPresent, uint8_t waterPercent,
+                      int waterRawValue)
+  {
     oled.clear();
-    oled.setScale(1);
-    oled.setCursor(20, 0);  // СТРОКА 0
-    oled.print(F("О СИСТЕМЕ"));
-    oled.line(0, 10, 127, 10);
-    oled.setCursor(0, 2);  // СТРОКА 2
-    oled.print(F("v"));
-    oled.print(FIRMWARE_VERSION);
-    oled.setCursor(0, 3);  // СТРОКА 3
-    oled.print(F("kelll31"));
-    oled.setCursor(0, 4);  // СТРОКА 4
-    oled.print(F("Работа:"));
-    if (workTime >= 3600) {
-      oled.print(workTime / 3600);
-      oled.print(F("ч"));
+
+    if (!sensorOK)
+    {
+      oled.setCursor(15, 3);
+      oled.setScale(2);
+      oled.print("ОШИБКА");
+      oled.setCursor(20, 6);
+      oled.setScale(1);
+      oled.print("DHT22");
+      lastSensorOK = sensorOK;
+      firstDraw = false;
+      oled.update();
+      return;
     }
+
+    cursorX = 0;
+    cursorY = 0;
+    oled.setCursor(cursorX, cursorY);
+    oled.setScale(2);
+    if (temp >= -40 && temp <= 80)
+      oled.print((int)temp);
+    else
+      oled.print("--");
+    oled.print("C");
+
+    cursorX = 70;
+    cursorY = 0;
+    oled.setCursor(cursorX, cursorY);
+    if (hum >= 0 && hum <= 100)
+      oled.print((int)hum);
+    else
+      oled.print("--");
+    oled.print("%");
+
+    cursorX = 0;
+    cursorY = 2;
+    oled.setCursor(cursorX, cursorY);
+    oled.setScale(1);
+    oled.print("SET:");
+    oled.print(targetHum);
+    oled.print("%");
+
+    cursorX = 55;
+    cursorY = 2;
+    oled.setCursor(cursorX, cursorY);
+    if (!waterSensorPresent)
+      oled.print("--");
+    else if (waterLow)
+      oled.print("NO WATER!");
+    else if (waterPercent < 30)
+      oled.print("LOW");
+    else
+    {
+      oled.print("OK");
+      oled.print(waterPercent);
+      oled.print("%");
+    }
+
+    if (currentMode == MODE_GRAPH) {
+      drawGraph();
+    }
+
+    oled.update();
+  }
+
+  void drawAboutScreen(unsigned long workTime, uint8_t switchCount,
+                       unsigned long totalSwitches, bool waterSensorPresent,
+                       uint16_t waterThreshold, int waterRawValue)
+  {
+    oled.clear();
+    cursorX = 20;
+    cursorY = 0;
+    oled.setCursor(cursorX, cursorY);
+    oled.setScale(1);
+    oled.print("О СИСТЕМЕ");
+    line(0, 1, 127, 1);
+
+    cursorX = 0;
+    cursorY = 2;
+    oled.setCursor(cursorX, cursorY);
+    oled.print("v");
+    oled.print(FIRMWARE_VERSION);
+    cursorX = 70;
+    cursorY = 2;
+    oled.setCursor(cursorX, cursorY);
+    oled.print("kelll31");
+
+    cursorX = 0;
+    cursorY = 3;
+    oled.setCursor(cursorX, cursorY);
+    oled.print("Работа:");
+    oled.print(workTime / 3600);
+    oled.print("ч");
     oled.print((workTime % 3600) / 60);
-    oled.print(F("м"));
-    oled.setCursor(0, 5);  // СТРОКА 5
-    oled.print(F("Перекл:"));
+    oled.print("м");
+
+    cursorX = 0;
+    cursorY = 4;
+    oled.setCursor(cursorX, cursorY);
+    oled.print("Перекл:");
     oled.print(switchCount);
-    oled.print(F("/ч"));
-    oled.setCursor(0, 7);  // СТРОКА 7
-    oled.print(F("ДЛ-выход"));
+    oled.print("/ч");
+
+    if (waterSensorPresent)
+    {
+      cursorX = 0;
+      cursorY = 5;
+      oled.setCursor(cursorX, cursorY);
+      oled.print("Вода:");
+      oled.print(waterRawValue);
+      oled.print("/");
+      oled.print(waterThreshold);
+    }
+
+    cursorX = 0;
+    cursorY = 7;
+    oled.setCursor(cursorX, cursorY);
+    oled.print("ДЛ-выход");
     oled.update();
   }
 
   void drawCalibrationScreen(float currentTemp, float currentHum,
-                             float tempCal, float humCal, bool editingTemp) {
+                             float tempCal, float humCal, bool editingTemp)
+  {
     oled.clear();
+    cursorX = 15;
+    cursorY = 0;
+    oled.setCursor(cursorX, cursorY);
     oled.setScale(1);
-    oled.setCursor(15, 0);  // СТРОКА 0
-    oled.print(F("КАЛИБРОВКА"));
-    oled.line(0, 10, 127, 10);
-    oled.setCursor(0, 2);  // СТРОКА 2
-    oled.print(F("T:"));
-    oled.print(currentTemp, 1);
-    oled.print(F("C H:"));
-    oled.print(currentHum, 1);
-    oled.print(F("%"));
-    oled.setCursor(0, 4);  // СТРОКА 4
-    if (editingTemp) oled.print(F("> "));
-    oled.print(F("КорT:"));
-    if (tempCal >= 0) oled.print(F("+"));
-    oled.print(tempCal, 1);
-    oled.setCursor(0, 5);  // СТРОКА 5
-    if (!editingTemp) oled.print(F("> "));
-    oled.print(F("КорH:"));
-    if (humCal >= 0) oled.print(F("+"));
-    oled.print(humCal, 1);
-    oled.setCursor(0, 7);  // СТРОКА 7
-    oled.print(F("КН=след ДЛ=OK"));
+    oled.print("КАЛИБРОВКА");
+    line(0, 1, 127, 1);
+
+    cursorX = 0;
+    cursorY = 2;
+    oled.setCursor(cursorX, cursorY);
+    oled.print("Т:");
+    oled.print((int)currentTemp);
+    oled.print("C В:");
+    oled.print((int)currentHum);
+    oled.print("%");
+
+    cursorX = 0;
+    cursorY = 4;
+    oled.setCursor(cursorX, cursorY);
+    if (editingTemp)
+      oled.print("> ");
+    oled.print("КорТ:");
+    if (tempCal >= 0)
+      oled.print("+");
+    oled.print((int)tempCal);
+
+    cursorX = 0;
+    cursorY = 5;
+    oled.setCursor(cursorX, cursorY);
+    if (!editingTemp)
+      oled.print("> ");
+    oled.print("КорВ:");
+    if (humCal >= 0)
+      oled.print("+");
+    oled.print((int)humCal);
+
+    cursorX = 0;
+    cursorY = 7;
+    oled.setCursor(cursorX, cursorY);
+    oled.print("КН- след ДЛ-OK");
     oled.update();
   }
 
-  void clear() {
+  void drawWaterCalibrationScreen(int currentValue, uint16_t threshold,
+                                  bool sensorPresent, uint8_t waterPercent)
+  {
+    oled.clear();
+    cursorX = 10;
+    cursorY = 0;
+    oled.setCursor(cursorX, cursorY);
+    oled.setScale(1);
+    oled.print("ПОРОГ ВОДЫ");
+    line(0, 1, 127, 1);
+
+    cursorX = 0;
+    cursorY = 2;
+    oled.setCursor(cursorX, cursorY);
+    if (!sensorPresent)
+      oled.print("НЕТ ДАТЧИКА!");
+    else
+    {
+      oled.print("Текущий:");
+      oled.print(currentValue);
+      cursorX = 0;
+      cursorY = 3;
+      oled.setCursor(cursorX, cursorY);
+      oled.print("Порог:");
+      oled.print(threshold);
+      if ((uint16_t)currentValue < threshold)
+      {
+        cursorX = 0;
+        cursorY = 4;
+        oled.setCursor(cursorX, cursorY);
+        oled.print("НИЗКАЯ ВОДА!");
+      }
+      cursorX = 0;
+      cursorY = 5;
+      oled.setCursor(cursorX, cursorY);
+      oled.print("Уровень:");
+      oled.print(waterPercent);
+      oled.print("%");
+    }
+
+    cursorX = 0;
+    cursorY = 7;
+    oled.setCursor(cursorX, cursorY);
+    oled.print("КН-меню ДЛ-сохр");
+    oled.update();
+  }
+
+  // Экран ручного режима
+  void drawManualScreen(bool isOn)
+  {
+    oled.clear();
+    cursorX = 25;
+    cursorY = 0;
+    oled.setCursor(cursorX, cursorY);
+    oled.setScale(1);
+    oled.print("РУЧНОЙ РЕЖИМ");
+    line(0, 1, 127, 1);
+
+    cursorX = 20;
+    cursorY = 3;
+    oled.setCursor(cursorX, cursorY);
+    oled.setScale(2);
+    if (isOn) {
+      oled.print("ВКЛ");
+    } else {
+      oled.print("ВЫКЛ");
+    }
+
+    cursorX = 0;
+    cursorY = 6;
+    oled.setCursor(cursorX, cursorY);
+    oled.setScale(1);
+    oled.print("Поворот:перекл");
+
+    cursorX = 0;
+    cursorY = 7;
+    oled.setCursor(cursorX, cursorY);
+    oled.print("КН-выход");
+
+    oled.update();
+  }
+
+  void clear()
+  {
     oled.clear();
   }
 
-  void update() {
+  void update()
+  {
     oled.update();
   }
 
-  void setCursor(uint8_t x, uint8_t y) {
+  void setCursor(uint8_t x, uint8_t y)
+  {
+    cursorX = x;
+    cursorY = y;
     oled.setCursor(x, y);
   }
 
-  void print(const char* t) { oled.print(t); }
-  void print(const __FlashStringHelper* t) { oled.print(t); }
+  void print(const char *t) { oled.print(t); }
+  void print(const __FlashStringHelper *t) { oled.print(t); }
   void print(int v) { oled.print(v); }
-  void print(float v, int d = 1) { oled.print(v, d); }
-
-  void setScale(uint8_t s) {
-    oled.setScale(s);
+  void print(float v, int d = 1) { oled.print((int)v); }
+  void setScale(uint8_t s)
+  {
+    textScale = constrain(s, 1, 4);
+    oled.setScale(textScale);
   }
 
-  void drawLine(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1) {
-    oled.line(x0, y0, x1, y1);
+  void drawRect(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, bool fill = false)
+  {
+    oled.rect(x0, y0, x1, y1, fill ? OLED_FILL : OLED_STROKE);
   }
 
-  void drawRect(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, bool fill = false) {
-    if (fill) {
-      oled.rect(x0, y0, x1, y1, OLED_FILL);
-    } else {
-      oled.line(x0, y0, x1, y0);
-      oled.line(x0, y1, x1, y1);
-      oled.line(x0, y0, x0, y1);
-      oled.line(x1, y0, x1, y1);
-    }
-  }
-
-  void invertRect(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1) {
+  void invertRect(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1)
+  {
     oled.rect(x0, y0, x1, y1, OLED_FILL);
   }
 };
